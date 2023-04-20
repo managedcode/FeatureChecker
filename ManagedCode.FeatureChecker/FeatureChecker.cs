@@ -183,4 +183,10 @@ public class FeatureChecker
 
         UpdateFeatureStatus(feature.Name, feature.Status);
     }
+
+    public Feature? GetFeatureByName(string name)
+    {
+        return _features.FirstOrDefault(x =>
+            x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
 }
