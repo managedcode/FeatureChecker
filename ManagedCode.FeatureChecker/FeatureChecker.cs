@@ -55,17 +55,61 @@ public class FeatureChecker
         }
     }
 
-    public void RemoveFeature(string name) 
-        => throw new NotImplementedException();
+    public void RemoveFeature(string name, bool ignoreMissing = true)
+    {
+        if(IsFeatureExists(name))
+        {
+            var feature = _features.First(x =>
+                x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+            RemoveFeature(feature);
+
+            return;
+        }
+
+        if(!ignoreMissing)
+        {
+            throw new ArgumentException($"Feature '{nameof(name)}' does not exist.");
+        }
+    }
 
     public void RemoveFeature(Feature feature)
-        => throw new NotImplementedException();
+    {
+        if(feature == null)
+        {
+            throw new ArgumentNullException(nameof(feature), $"Parameter is null.");
+        }
 
-    public void RemoveFeatureRange(IEnumerable<string> features)
-        => throw new NotImplementedException();
+        _features.Remove(feature);
+    }
+
+    public void RemoveFeatureRange(IEnumerable<string> features, bool ignoreMissing = true)
+    {
+        if(features == null)
+        {
+            throw new ArgumentNullException(nameof(features), $"Parameter is null.");
+        }
+
+        foreach(var feature in features)
+        {
+            RemoveFeature(feature, ignoreMissing);
+        }
+    }
 
     public void RemoveFeatureRange(IEnumerable<Feature> features)
-        => throw new NotImplementedException();
+    {
+        if(features == null)
+        {
+            throw new ArgumentNullException(nameof(features), $"Parameter is null.");
+        }
+
+        foreach(var feature in features)
+        {
+            RemoveFeature(feature);
+        }
+    }
+
+    public void RemoveAllFeatures() => _features.Clear();
 
     public bool IsFeatureExists(string? name)
     {
