@@ -2,7 +2,7 @@
 
 public enum FeatureStatus
 {
-    Eanabled,
     Disabled,
+    Eanabled,
     Debug,
 }
