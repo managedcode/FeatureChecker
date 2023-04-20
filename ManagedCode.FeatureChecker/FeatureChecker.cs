@@ -32,36 +32,37 @@ public class FeatureChecker
         }
     }
 
-    public void AddFeature(Feature feature, bool ignoreDuplicates = true)
+    public void AddFeature(Feature newFeature, bool ignoreDuplicates = true)
     {
-        if(feature == null)
+        ThrowIfNull(newFeature, nameof(newFeature));
+
+        if(!IsFeatureExists(newFeature.Name))
         {
-            throw new ArgumentNullException(nameof(feature), $"Parameter is null.");
+            _features.Add(newFeature);
         }
 
-        AddFeature(feature.Name, feature.Status, ignoreDuplicates);
+        if(!ignoreDuplicates)
+        {
+            throw new ArgumentException($"Feature '{nameof(newFeature)}' is already added.");
+        }
     }
 
-    public void AddFeaturesRange(IEnumerable<Feature> features, bool ignoreDuplicates = true)
+    public void AddFeaturesRange(IEnumerable<Feature> newFeatures, bool ignoreDuplicates = true)
     {
-        if(features == null)
-        {
-            throw new ArgumentNullException(nameof(features), $"Parameter is null.");
-        }
+        ThrowIfNull(newFeatures, nameof(newFeatures));
 
-        foreach(var feature in features)
+        foreach(var feature in newFeatures)
         {
             AddFeature(feature, ignoreDuplicates);
         }
     }
 
+
     public void RemoveFeature(string name, bool ignoreMissing = true)
     {
         if(IsFeatureExists(name))
         {
-            var feature = _features.First(x =>
-                x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-
+            var feature = _features.First(x => AreNamesEqual(name, x));
             RemoveFeature(feature);
 
             return;
@@ -75,20 +76,13 @@ public class FeatureChecker
 
     public void RemoveFeature(Feature feature)
     {
-        if(feature == null)
-        {
-            throw new ArgumentNullException(nameof(feature), $"Parameter is null.");
-        }
-
+        ThrowIfNull(feature, nameof(feature));
         _features.Remove(feature);
     }
 
     public void RemoveFeatureRange(IEnumerable<string> features, bool ignoreMissing = true)
     {
-        if(features == null)
-        {
-            throw new ArgumentNullException(nameof(features), $"Parameter is null.");
-        }
+        ThrowIfNull(features, nameof(features));
 
         foreach(var feature in features)
         {
@@ -98,10 +92,7 @@ public class FeatureChecker
 
     public void RemoveFeatureRange(IEnumerable<Feature> features)
     {
-        if(features == null)
-        {
-            throw new ArgumentNullException(nameof(features), $"Parameter is null.");
-        }
+        ThrowIfNull(features, nameof(features));
 
         foreach(var feature in features)
         {
@@ -111,29 +102,28 @@ public class FeatureChecker
 
     public void RemoveAllFeatures() => _features.Clear();
 
+
     public bool IsFeatureExists(string? name)
     {
         if(string.IsNullOrWhiteSpace(name))
         {
-            throw new ArgumentNullException($"Invalid parameter '{nameof(name)}': {name}.");
+            throw new ArgumentException($"Invalid parameter '{nameof(name)}': {name}.");
         }
 
-        return _features.Any(x =>
-            x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        return _features.Any(x => AreNamesEqual(name, x));
     }
 
     public bool IsFeatureEnabled(string name)
     {
-        var feature = _features.FirstOrDefault(x =>
-            x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        var feature = _features.FirstOrDefault(x => AreNamesEqual(name, x));
 
         return feature?.Status == FeatureStatus.Eanabled;
     }
 
+
     public FeatureStatus GetFeatureStatus(string name)
     {
-        var feature = _features.FirstOrDefault(x =>
-            x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        var feature = _features.FirstOrDefault(x => AreNamesEqual(name, x));
 
         if(feature == null)
         {
@@ -145,14 +135,19 @@ public class FeatureChecker
 
     public bool TryGetFeatureStatus(string name, out FeatureStatus status)
     {
-        var feature = _features.FirstOrDefault(x =>
-            x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        var feature = _features.FirstOrDefault(x => AreNamesEqual(name, x));
 
         status = feature == null
             ? default
             : feature.Status;
 
         return feature != null;
+    }
+
+
+    public Feature? GetFeatureByName(string name)
+    {
+        return _features.FirstOrDefault(x => AreNamesEqual(name, x));
     }
 
     public IEnumerable<Feature> GetExistFeatures() => _features.AsReadOnly();
@@ -162,6 +157,7 @@ public class FeatureChecker
         return _features.Where(x => x.Status == status);
     }
 
+
     public void UpdateFeatureStatus(string name, FeatureStatus status)
     {
         if(!IsFeatureExists(name))
@@ -169,24 +165,20 @@ public class FeatureChecker
             throw new ArgumentException($"Feature '{nameof(name)}' does not exist.");
         }
 
-        _features.First(x 
-                => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-            .Status = status;
+        _features.First(x => AreNamesEqual(name, x)).Status = status;
     }
 
-    public void UpdateFeatureStatus(Feature feature)
+
+    private static bool AreNamesEqual(string name, Feature fName)
     {
-        if(feature == null)
+        return fName.Name.Equals(name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void ThrowIfNull(object obj, string paramName)
+    {
+        if(obj == null)
         {
-            throw new ArgumentNullException(nameof(feature), $"Parameter is null.");
+            throw new ArgumentNullException(paramName, $"Parameter is null.");
         }
-
-        UpdateFeatureStatus(feature.Name, feature.Status);
-    }
-
-    public Feature? GetFeatureByName(string name)
-    {
-        return _features.FirstOrDefault(x =>
-            x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
 }
