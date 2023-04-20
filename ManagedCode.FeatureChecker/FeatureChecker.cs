@@ -111,11 +111,12 @@ public class FeatureChecker
         return feature != null;
     }
 
-    public IEnumerable<Feature> GetExistFeatures(string name) 
-        => throw new NotImplementedException();
+    public IEnumerable<Feature> GetExistFeatures() => _features.AsReadOnly();
 
     public IEnumerable<Feature> GetFeaturesByStatus(FeatureStatus status)
-        => throw new NotImplementedException();
+    {
+        return _features.Where(x => x.Status == status);
+    }
 
     public void UpdateFeatureStatus(string name, FeatureStatus status)
     {
