@@ -92,4 +92,26 @@ public class FeatureChecker
 
     public IEnumerable<Feature> GetFeaturesByStatus(FeatureStatus status)
         => throw new NotImplementedException();
+
+    public void UpdateFeatureStatus(string name, FeatureStatus status)
+    {
+        if(!IsFeatureExists(name))
+        {
+            throw new ArgumentException($"Feature '{nameof(name)}' does not exist.");
+        }
+
+        _features.First(x 
+                => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            .Status = status;
+    }
+
+    public void UpdateFeatureStatus(Feature feature)
+    {
+        if(feature == null)
+        {
+            throw new ArgumentNullException(nameof(feature), $"Parameter is null.");
+        }
+
+        UpdateFeatureStatus(feature.Name, feature.Status);
+    }
 }
