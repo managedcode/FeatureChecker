@@ -79,13 +79,37 @@ public class FeatureChecker
     }
 
     public bool IsFeatureEnabled(string name)
-        => throw new NotImplementedException();
+    {
+        var feature = _features.FirstOrDefault(x =>
+            x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
-    public FeatureStatus GetFeatureStatus(string name) 
-        => throw new NotImplementedException();
+        return feature?.Status == FeatureStatus.Eanabled;
+    }
 
-    public bool TryGetFeatureStatus(string name, out FeatureStatus status) 
-        => throw new NotImplementedException();  
+    public FeatureStatus GetFeatureStatus(string name)
+    {
+        var feature = _features.FirstOrDefault(x =>
+            x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+        if(feature == null)
+        {
+            throw new ArgumentException($"Feature '{nameof(name)}' does not exist.");
+        }
+
+        return feature.Status;
+    }
+
+    public bool TryGetFeatureStatus(string name, out FeatureStatus status)
+    {
+        var feature = _features.FirstOrDefault(x =>
+            x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+        status = feature == null
+            ? default
+            : feature.Status;
+
+        return feature != null;
+    }
 
     public IEnumerable<Feature> GetExistFeatures(string name) 
         => throw new NotImplementedException();
