@@ -36,11 +36,7 @@ public class FeatureChecker
 
     public void RemoveFeature(string name)
     {
-        if(string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException($"Invalid parameter '{nameof(name)}': {name}.");
-        }
-
+        ThrowIfNullOrEmpty(name, nameof(name));
         _features.Remove(name);
     }
 
@@ -49,15 +45,10 @@ public class FeatureChecker
 
     public bool IsFeatureExists(string name)
     {
-        if(string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException($"Invalid parameter '{nameof(name)}': {name}.");
-        }
+        ThrowIfNullOrEmpty(name, nameof(name));
 
         return _features.ContainsKey(name);
     }
-
-
 
     public bool TryGetFeatureStatus(string name, out FeatureStatus status)
     {
@@ -67,16 +58,13 @@ public class FeatureChecker
         return result;
     }
 
-
     public bool TryGetFeatureByName(string name, out Feature? feature)
     {
-        if(string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException($"Invalid parameter '{nameof(name)}': {name}.");
-        }
+        ThrowIfNullOrEmpty(name, nameof(name));
 
         return _features.TryGetValue(name, out feature);
     }
+
 
     public Feature[] GetExistFeatures() => _features.Values.ToArray();
 
@@ -104,6 +92,14 @@ public class FeatureChecker
         if(obj == null)
         {
             throw new ArgumentNullException(paramName, $"Parameter is null.");
+        }
+    }
+
+    private static void ThrowIfNullOrEmpty(string arg, string argName)
+    {
+        if(string.IsNullOrWhiteSpace(arg))
+        {
+            throw new ArgumentException($"Invalid parameter '{argName}': {arg}.");
         }
     }
 
