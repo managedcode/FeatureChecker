@@ -35,11 +35,12 @@ public class FeatureHolder
             : false;
     }
 
-    public bool TryRemoveFeature(string featureName)
+    public void RemoveFeature(string featureName)
     {
-        return ValidateFeatureName(featureName)
-            ? _features.Remove(featureName)
-            : false;
+        if(ValidateFeatureName(featureName))
+        {
+            _features.Remove(featureName);
+        }
     }
 
     public void UpdateFeatureStatus(string featureName, FeatureStatus status)
