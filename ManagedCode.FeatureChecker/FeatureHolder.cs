@@ -1,13 +1,18 @@
-﻿using System.Collections.Generic;
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 
 namespace ManagedCode.FeatureChecker;
 public class FeatureHolder
 {
-    public readonly Dictionary<string, FeatureStatus> _features;
+    private Dictionary<string, FeatureStatus> _features;
 
-    public ImmutableDictionary<string, FeatureStatus> Features =>
-        _features.ToImmutableDictionary();
+    [JsonInclude]
+    public ImmutableDictionary<string, FeatureStatus> Features
+    {
+        get => _features.ToImmutableDictionary();
+        private set => _features = new Dictionary<string, FeatureStatus>(value);
+    }
+
 
     public FeatureHolder()
     {
