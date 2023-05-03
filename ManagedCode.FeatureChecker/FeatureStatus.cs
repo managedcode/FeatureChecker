@@ -4,5 +4,5 @@ public enum FeatureStatus
 {
     Disabled,
     Enabled,
-    Debug,
+    Debug
 }

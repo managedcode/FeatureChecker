@@ -2,45 +2,57 @@
 
 namespace ManagedCode.FeatureChecker;
 
-public class FeatureChecker
+public class FeatureChecker : IFeatureChecker
 {
-    private readonly ImmutableDictionary<string, FeatureStatus> _features;
+    private readonly ImmutableDictionary<Enum, FeatureStatus> _features;
+
+    public FeatureChecker(IDictionary<Enum, FeatureStatus> featureHolder)
+    {
+        _features = featureHolder.ToImmutableDictionary();
+    }
 
     public int Count => _features.Count;
 
-    public FeatureChecker(FeatureHolder featureHolder)
+    public bool IsFeatureExists(Enum feature)
     {
-        _features = featureHolder.Features;
+        return _features.ContainsKey(feature);
     }
 
-    public bool IsFeatureExists(string name)
+    public bool IsEnabled(Enum feature)
     {
-        return ValidateFeatureName(name)
-            ? _features.ContainsKey(name)
-            : false;
+        if (_features.TryGetValue(feature, out var status))
+            return status == FeatureStatus.Enabled;
+
+        return false;
     }
 
-    public bool TryGetFeatureStatus(string name, out FeatureStatus status)
+    public bool IsDisabled(Enum feature)
+    {
+        if (_features.TryGetValue(feature, out var status))
+            return status == FeatureStatus.Disabled;
+
+        return false;
+    }
+
+    public bool IsDebug(Enum feature)
+    {
+        if (_features.TryGetValue(feature, out var status))
+            return status == FeatureStatus.Debug;
+
+        return false;
+    }
+
+    public bool TryGetFeatureStatus(Enum feature, out FeatureStatus status)
     {
         status = default;
-
-        return ValidateFeatureName(name)
-            ? _features.TryGetValue(name, out status)
-            : false;
+        return _features.TryGetValue(feature, out status);
     }
 
-    public List<string> GetFeaturesByStatus(FeatureStatus status)
+    public List<Enum> GetFeaturesByStatus(FeatureStatus status)
     {
         return _features
             .Where(x => x.Value == status)
             .Select(x => x.Key)
             .ToList();
     }
-
-
-    private bool ValidateFeatureName(string featureName)
-    {
-        return !string.IsNullOrWhiteSpace(featureName);
-    }
-
 }
