@@ -1,110 +1,46 @@
-﻿namespace ManagedCode.FeatureChecker;
+﻿using System.Collections.Immutable;
+
+namespace ManagedCode.FeatureChecker;
 
 public class FeatureChecker
 {
-    private readonly Dictionary<string, Feature> _features;
+    private readonly ImmutableDictionary<string, FeatureStatus> _features;
 
-    public FeatureChecker()
+    public int Count => _features.Count;
+
+    public FeatureChecker(FeatureHolder featureHolder)
     {
-        _features = new Dictionary<string, Feature>();
+        _features = featureHolder.Features;
     }
-
-    public event EventHandler FeatureAdded;
-    public event EventHandler FeatureRemoved;
-    public event EventHandler FeatureStatusChanged;
-
-
-    public bool TryAddFeature(string name, FeatureStatus status)
-    {
-        var feature = new Feature()
-        {
-            Name = name,
-            Status = status
-        };
-
-        return TryAddFeature(feature);
-    }
-
-    public bool TryAddFeature(Feature newFeature)
-    {
-        ThrowIfNull(newFeature, nameof(newFeature));
-        ValidateModel(newFeature);
-
-        return _features.TryAdd(newFeature.Name, newFeature);
-    }
-
-
-    public void RemoveFeature(string name)
-    {
-        ThrowIfNullOrEmpty(name, nameof(name));
-        _features.Remove(name);
-    }
-
-    public void RemoveAllFeatures() => _features.Clear();
-
 
     public bool IsFeatureExists(string name)
     {
-        ThrowIfNullOrEmpty(name, nameof(name));
-
-        return _features.ContainsKey(name);
+        return ValidateFeatureName(name)
+            ? _features.ContainsKey(name)
+            : false;
     }
 
     public bool TryGetFeatureStatus(string name, out FeatureStatus status)
     {
-        var result = TryGetFeatureByName(name, out Feature? feature);
-        status = feature?.Status ?? default;
+        status = default;
 
-        return result;
+        return ValidateFeatureName(name)
+            ? _features.TryGetValue(name, out status)
+            : false;
     }
 
-    public bool TryGetFeatureByName(string name, out Feature? feature)
+    public List<string> GetFeaturesByStatus(FeatureStatus status)
     {
-        ThrowIfNullOrEmpty(name, nameof(name));
-
-        return _features.TryGetValue(name, out feature);
+        return _features
+            .Where(x => x.Value == status)
+            .Select(x => x.Key)
+            .ToList();
     }
 
 
-    public Feature[] GetExistFeatures() => _features.Values.ToArray();
-
-    public IEnumerable<Feature> GetFeaturesByStatus(FeatureStatus status)
+    private bool ValidateFeatureName(string featureName)
     {
-        return _features.Values.Where(x => x.Status == status);
+        return !string.IsNullOrWhiteSpace(featureName);
     }
 
-
-    public bool TryUpdateFeatureStatus(string name, FeatureStatus status)
-    {
-        var result = TryGetFeatureByName(name, out Feature? feature);
-
-        if(result && feature != null)
-        {
-            feature.Status = FeatureStatus.Disabled;
-        }
-
-        return result;
-    }
-
-
-    private static void ThrowIfNull(object obj, string paramName)
-    {
-        if(obj == null)
-        {
-            throw new ArgumentNullException(paramName, $"Parameter is null.");
-        }
-    }
-
-    private static void ThrowIfNullOrEmpty(string arg, string argName)
-    {
-        if(string.IsNullOrWhiteSpace(arg))
-        {
-            throw new ArgumentException($"Invalid parameter '{argName}': {arg}.");
-        }
-    }
-
-    private static void ValidateModel(Feature feature)
-    {
-        //do some validation
-    }
 }

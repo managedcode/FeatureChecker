@@ -3,6 +3,6 @@
 public enum FeatureStatus
 {
     Disabled,
-    Eanabled,
+    Enabled,
     Debug,
 }
