@@ -17,8 +17,8 @@
         <RepositoryUrl>https://github.com/managedcode/FeatureChecker</RepositoryUrl>
         <PackageProjectUrl>https://github.com/managedcode/FeatureChecker</PackageProjectUrl>
         <Product>Managed Code - FeatureChecker</Product>
-        <Version>0.0.1</Version>
-        <PackageVersion>0.0.1</PackageVersion>
+        <Version>0.0.8</Version>
+        <PackageVersion>0.0.8</PackageVersion>
 
     </PropertyGroup>
     <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
