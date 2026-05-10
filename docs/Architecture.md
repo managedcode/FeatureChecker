@@ -132,6 +132,7 @@ flowchart TD
 - The core package owns deterministic local evaluation and JSON snapshots.
 - Vendor, cloud, edge, and ManagedCode.Storage integrations should be separate adapter packages unless a later ADR changes the package boundary.
 - GitHub's default CodeQL setup is the code-scanning owner; the checked-in advanced CodeQL workflow was removed to avoid duplicate setup failures.
+- Release runs from `main` after format, build, analyzers, all tests, integration-category tests, and an 85% line coverage gate; the release job creates the version tag only after a successful NuGet publish.
 - Add ADRs under `docs/ADR/` for public API model changes, provider architecture, release policy shifts, or new runtime dependencies.
 - Current core-boundary ADR: [ADR 0001](ADR/0001-core-feature-boundary.md).
 

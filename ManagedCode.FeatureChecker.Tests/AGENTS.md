@@ -13,6 +13,7 @@ Parent: `../AGENTS.md`
 - `Access/FeatureAccessTests.cs` - factory, builder-interface, scope, and file-backed freshness tests.
 - `DependencyInjection/FeatureCheckerDependencyInjectionTests.cs` - Microsoft.Extensions configuration and service registration tests.
 - `Evaluation/FeatureCheckerEvaluationTests.cs` - evaluator, dependencies, variants, typed values, and evaluation collection tests.
+- `Integration/FeatureCheckerIntegrationTests.cs` - end-to-end public API tests across storage, dependency injection, factories, scopes, and evaluation.
 - `Segments/FeatureSegmentTests.cs` - list and rule-based segment tests.
 - `Storage/FeatureStorageTests.cs` - snapshot serialization and file-backed provider tests.
 - `Targeting/FeatureConditionOperatorTests.cs` - positive, negative, missing-attribute, and version condition operator tests.
@@ -68,3 +69,4 @@ Parent: `../AGENTS.md`
 - Prefer meaningful assertions over count-only tests.
 - Cover unknown features, all feature states, status filtering, targeting rules, scope helpers, and typed default-value semantics when feature semantics change.
 - Do not weaken assertions to fit an implementation change.
+- Integration tests must use TUnit `[Category("Integration")]` and remain runnable through the repo's integration filter in CI.

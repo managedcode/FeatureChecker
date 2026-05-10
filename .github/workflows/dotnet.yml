@@ -13,6 +13,8 @@ permissions:
 env:
   DOTNET_VERSION: 10.0.x
   SOLUTION: ManagedCode.FeatureChecker.slnx
+  COVERAGE_THRESHOLD: 85
+  COVERAGE_FILE: ManagedCode.FeatureChecker.Tests/bin/Release/net10.0/TestResults/coverage.cobertura.xml
 
 jobs:
   verify:
@@ -41,8 +43,36 @@ jobs:
       - name: Test
         run: dotnet test --solution ${{ env.SOLUTION }} --configuration Release --no-restore --verbosity normal
 
+      - name: Integration tests
+        run: dotnet test --solution ${{ env.SOLUTION }} --configuration Release --no-build --verbosity normal -- --treenode-filter "/*/*/*/*[Category=Integration]"
+
       - name: Coverage
-        run: dotnet test --solution ${{ env.SOLUTION }} --configuration Release --no-build --verbosity normal -- --coverage --coverage-output-format cobertura
+        run: dotnet test --solution ${{ env.SOLUTION }} --configuration Release --no-build --verbosity normal -- --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
+
+      - name: Enforce coverage threshold
+        shell: bash
+        run: |
+          if [[ ! -f "${COVERAGE_FILE}" ]]; then
+            echo "::error::Coverage file not found: ${COVERAGE_FILE}"
+            exit 1
+          fi
+
+          line_rate="$(sed -n 's/.*line-rate="\([^"]*\)".*/\1/p' "${COVERAGE_FILE}" | head -n 1)"
+
+          if [[ -z "${line_rate}" ]]; then
+            echo "::error::Could not read line-rate from ${COVERAGE_FILE}"
+            exit 1
+          fi
+
+          awk -v rate="${line_rate}" -v threshold="${COVERAGE_THRESHOLD}" 'BEGIN {
+            coverage = rate * 100
+            printf("Line coverage: %.2f%%\n", coverage)
+
+            if (coverage + 0.000001 < threshold) {
+              printf("Line coverage %.2f%% is below required %.2f%%\n", coverage, threshold)
+              exit 1
+            }
+          }'
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4

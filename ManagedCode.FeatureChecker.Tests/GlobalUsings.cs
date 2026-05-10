@@ -5,5 +5,6 @@ global using ManagedCode.FeatureChecker.Evaluation;
 global using ManagedCode.FeatureChecker.Segments;
 global using ManagedCode.FeatureChecker.Storage;
 global using ManagedCode.FeatureChecker.Targeting;
+global using ManagedCode.FeatureChecker.Tests;
 global using Shouldly;
 global using FeatureCheckerEvaluator = ManagedCode.FeatureChecker.Evaluation.FeatureChecker;

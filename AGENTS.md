@@ -122,6 +122,8 @@ Local `AGENTS.md` files may tighten these values. They must not loosen them with
 - Prefer testing caller-visible behaviour through public contracts over implementation details.
 - Flaky tests are failures. Fix the cause.
 - Production code changes should preserve or improve coverage. Public contracts and critical flows require explicit success and failure assertions.
+- CI and release gates must fail when line coverage is below 85%.
+- Integration behaviour must be covered by TUnit tests marked with `[Category("Integration")]` and run as an explicit CI/release pass.
 - Do not skip tests to make a branch green.
 
 ## Code and Design
