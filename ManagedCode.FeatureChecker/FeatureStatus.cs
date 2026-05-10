@@ -1,4 +1,4 @@
-﻿namespace ManagedCode.FeatureChecker;
+namespace ManagedCode.FeatureChecker;
 
 public enum FeatureStatus
 {

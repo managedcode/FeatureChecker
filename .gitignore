@@ -33,6 +33,7 @@ e2e/*.map
 
 # System Files
 .DS_Store/
+.codex/
 
 ### ASPNETCore ###
 ## Ignore Visual Studio temporary files, build results, and

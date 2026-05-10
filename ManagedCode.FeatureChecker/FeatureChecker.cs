@@ -1,4 +1,4 @@
-﻿namespace ManagedCode.FeatureChecker;
+namespace ManagedCode.FeatureChecker;
 
 public class FeatureChecker : IFeatureChecker
 {
