@@ -1,14 +1,12 @@
-﻿using System.Collections.Immutable;
-
-namespace ManagedCode.FeatureChecker;
+﻿namespace ManagedCode.FeatureChecker;
 
 public class FeatureChecker : IFeatureChecker
 {
-    private readonly ImmutableDictionary<Enum, FeatureStatus> _features;
+    private readonly IReadOnlyDictionary<Enum, FeatureStatus> _features;
 
-    public FeatureChecker(IDictionary<Enum, FeatureStatus> featureHolder)
+    public FeatureChecker(IReadOnlyDictionary<Enum, FeatureStatus> featureHolder)
     {
-        _features = featureHolder.ToImmutableDictionary();
+        _features = new Dictionary<Enum, FeatureStatus>(featureHolder);
     }
 
     public int Count => _features.Count;
@@ -44,7 +42,6 @@ public class FeatureChecker : IFeatureChecker
 
     public bool TryGetFeatureStatus(Enum feature, out FeatureStatus status)
     {
-        status = default;
         return _features.TryGetValue(feature, out status);
     }
 

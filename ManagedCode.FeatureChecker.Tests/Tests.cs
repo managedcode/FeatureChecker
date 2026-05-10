@@ -1,31 +1,54 @@
-using FluentAssertions;
-using Xunit;
+using Shouldly;
 
 namespace ManagedCode.FeatureChecker.Tests;
 
-public class Tests
+public class FeatureCheckerTests
 {
-    [Fact]
-    public void TestDetectorTest()
+    [Test]
+    public void FeatureChecker_ShouldReportConfiguredFeatureStatuses()
     {
-        var holder = new FeatureHolder();
-        holder.Add(MyEnum.feature1, FeatureStatus.Enabled);
-        holder.Add(MyEnum.feature2, FeatureStatus.Disabled);
-        holder.Add(MyEnum.feature3, FeatureStatus.Enabled);
-        holder.Add(MyEnum.feature4, FeatureStatus.Disabled);
-        holder.Add(MyEnum.feature5, FeatureStatus.Debug);
+        var holder = new FeatureHolder
+        {
+            [MyEnum.Feature1] = FeatureStatus.Enabled,
+            [MyEnum.Feature2] = FeatureStatus.Disabled,
+            [MyEnum.Feature3] = FeatureStatus.Enabled,
+            [MyEnum.Feature4] = FeatureStatus.Disabled,
+            [MyEnum.Feature5] = FeatureStatus.Debug
+        };
 
         var checker = new FeatureChecker(holder);
 
-        checker.IsDebug(MyEnum.feature5).Should().BeTrue();
-        checker.IsDebug(MyEnum.feature1).Should().BeFalse();
+        checker.Count.ShouldBe(5);
+        checker.IsFeatureExists(MyEnum.Feature1).ShouldBeTrue();
+        checker.IsFeatureExists(MyEnum.Unknown).ShouldBeFalse();
 
-        checker.IsEnabled(MyEnum.feature1).Should().BeTrue();
-        checker.IsEnabled(MyEnum.feature5).Should().BeFalse();
-        checker.IsEnabled(MyEnum.feature2).Should().BeFalse();
+        checker.IsDebug(MyEnum.Feature5).ShouldBeTrue();
+        checker.IsDebug(MyEnum.Feature1).ShouldBeFalse();
 
-        checker.IsDisabled(MyEnum.feature2).Should().BeTrue();
-        checker.IsDisabled(MyEnum.feature3).Should().BeFalse();
-        checker.IsDisabled(MyEnum.feature5).Should().BeFalse();
+        checker.IsEnabled(MyEnum.Feature1).ShouldBeTrue();
+        checker.IsEnabled(MyEnum.Feature5).ShouldBeFalse();
+        checker.IsEnabled(MyEnum.Feature2).ShouldBeFalse();
+
+        checker.IsDisabled(MyEnum.Feature2).ShouldBeTrue();
+        checker.IsDisabled(MyEnum.Feature3).ShouldBeFalse();
+        checker.IsDisabled(MyEnum.Feature5).ShouldBeFalse();
+    }
+
+    [Test]
+    public void FeatureChecker_ShouldReturnFeatureStatusAndFilterByStatus()
+    {
+        var checker = new FeatureChecker(
+            new FeatureHolder
+            {
+                [MyEnum.Feature1] = FeatureStatus.Enabled,
+                [MyEnum.Feature2] = FeatureStatus.Disabled,
+                [MyEnum.Feature5] = FeatureStatus.Debug
+            });
+
+        checker.TryGetFeatureStatus(MyEnum.Feature5, out var status).ShouldBeTrue();
+        status.ShouldBe(FeatureStatus.Debug);
+
+        checker.TryGetFeatureStatus(MyEnum.Unknown, out _).ShouldBeFalse();
+        checker.GetFeaturesByStatus(FeatureStatus.Enabled).ShouldBe([MyEnum.Feature1]);
     }
 }

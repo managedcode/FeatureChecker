@@ -1,40 +1,37 @@
 # FeatureChecker
 
+Small enum-based feature checker for application feature contracts.
+
 ## Usage
 
-```js
-        var holder = new FeatureHolder();
+```csharp
+using ManagedCode.FeatureChecker;
 
-        holder.TryAddFeature("feature 1", default);
-        holder.TryAddFeature("feature 2", FeatureStatus.Enabled);
-        holder.TryAddFeature("feature 3", FeatureStatus.Debug);
+var holder = new FeatureHolder
+{
+    [ApplicationFeature.MarketplaceConnect] = FeatureStatus.Enabled,
+    [ApplicationFeature.ExperimentalReports] = FeatureStatus.Debug,
+    [ApplicationFeature.LegacyExport] = FeatureStatus.Disabled
+};
 
-        holder.UpdateFeatureStatus("feature 3", FeatureStatus.Enabled);
+var checker = new FeatureChecker(holder);
 
+if (checker.IsEnabled(ApplicationFeature.MarketplaceConnect))
+{
+    // Run the paid feature.
+}
 
-        var checker = new FeatureChecker(holder);
+var enabledFeatures = checker.GetFeaturesByStatus(FeatureStatus.Enabled);
 
-        if(checker.IsFeatureExists("feature_name"))
-        {
-            //do some things...
-        }
+if (checker.TryGetFeatureStatus(ApplicationFeature.ExperimentalReports, out var status))
+{
+    Console.WriteLine(status);
+}
 
-
-        var enabledFeatures = checker.GetFeaturesByStatus(FeatureStatus.Enabled);
-
-        foreach(var feat in enabledFeatures)
-        {
-            Console.WriteLine(feat);
-            //other code...
-        }
-
-
-        bool result = checker.TryGetFeatureStatus("myFeature", out FeatureStatus status);
-
-        if(result)
-        {
-            Console.WriteLine(status);
-            //other code...
-        }
-
+public enum ApplicationFeature
+{
+    MarketplaceConnect,
+    ExperimentalReports,
+    LegacyExport
+}
 ```
