@@ -9,9 +9,10 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);CS1591;CA1707;CA1848;CA1859</NoWarn>
-    <Version>10.0.0</Version>
+    <Version>10.0.1</Version>
     <PackageVersion>$(Version)</PackageVersion>
   </PropertyGroup>
 
@@ -26,8 +27,8 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>logo.png</PackageIcon>
-    <Description Condition="'$(Description)' == ''">Small feature flag checker for enum-based application feature contracts.</Description>
-    <PackageTags>managedcode;feature-flags;feature-checker;dotnet</PackageTags>
+    <Description Condition="'$(Description)' == ''">Provider-agnostic .NET feature flag SDK for feature management, targeting, segments, percentage rollouts, variants, remote config, JSON snapshots, and Microsoft.Extensions integration.</Description>
+    <PackageTags>managedcode;feature-flags;feature-toggle;feature-management;feature-checker;dotnet;csharp;targeting;segments;rollout;percentage-rollout;variants;remote-config;ab-testing;json;microsoft-extensions</PackageTags>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>
@@ -47,7 +48,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)CodeMetricsConfig.txt" Condition="Exists('$(MSBuildThisFileDirectory)CodeMetricsConfig.txt')" />
     <PackageReference Include="DotNet.ReproducibleBuilds" PrivateAssets="all" />
+    <PackageReference Include="Meziantou.Analyzer" PrivateAssets="all" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" />
   </ItemGroup>
 </Project>

@@ -34,7 +34,16 @@ csharp_style_var_when_type_is_apparent = true:suggestion
 dotnet_analyzer_diagnostic.category-Design.severity = warning
 dotnet_analyzer_diagnostic.category-Performance.severity = warning
 dotnet_analyzer_diagnostic.category-Reliability.severity = warning
-dotnet_analyzer_diagnostic.category-Security.severity = warning
+dotnet_analyzer_diagnostic.category-Security.severity = error
+
+dotnet_diagnostic.CA1501.severity = suggestion
+dotnet_diagnostic.CA1502.severity = warning
+dotnet_diagnostic.CA1505.severity = warning
+dotnet_diagnostic.CA1506.severity = warning
 
 [*.md]
 trim_trailing_whitespace = false
+
+# TUnit requires instance test methods; MA0038 conflicts with TUnit0048 for test cases.
+[ManagedCode.FeatureChecker.Tests/**/*.cs]
+dotnet_diagnostic.MA0038.severity = none

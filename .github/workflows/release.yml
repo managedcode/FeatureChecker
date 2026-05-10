@@ -1,0 +1,151 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version from Directory.Build.props, for example 10.0.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: 10.0.x
+  SOLUTION: ManagedCode.FeatureChecker.slnx
+  PROJECT: ManagedCode.FeatureChecker/ManagedCode.FeatureChecker.csproj
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+        run: |
+          props_version="$(grep -oPm1 '(?<=<Version>)[^<]+' Directory.Build.props)"
+
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${DISPATCH_VERSION}"
+          fi
+
+          if [[ -z "${version}" ]]; then
+            echo "::error::Release version is required."
+            exit 1
+          fi
+
+          if [[ "${version}" != "${props_version}" ]]; then
+            echo "::error::Release version ${version} does not match Directory.Build.props version ${props_version}."
+            exit 1
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "tag=v${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.SOLUTION }}
+
+      - name: Verify formatting
+        run: dotnet format ${{ env.SOLUTION }} --verify-no-changes
+
+      - name: Build
+        run: dotnet build ${{ env.SOLUTION }} --configuration Release --no-restore
+
+      - name: Analyze
+        run: dotnet build ${{ env.SOLUTION }} --configuration Release --no-restore -p:RunAnalyzers=true
+
+      - name: Test
+        run: dotnet test --solution ${{ env.SOLUTION }} --configuration Release --no-restore --verbosity normal
+
+      - name: Coverage
+        run: dotnet test --solution ${{ env.SOLUTION }} --configuration Release --no-build --verbosity normal -- --coverage --coverage-output-format cobertura
+
+      - name: Pack
+        run: dotnet pack ${{ env.PROJECT }} --configuration Release --no-build --output artifacts
+
+      - name: Ensure release tag exists
+        shell: bash
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+
+          if git rev-parse "${tag}" >/dev/null 2>&1; then
+            echo "Tag ${tag} already exists."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${tag}" -m "Release ${tag}"
+          git push origin "${tag}"
+
+      - name: Generate release notes
+        shell: bash
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          previous_tag="$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)"
+
+          {
+            echo "## ${tag}"
+            echo
+
+            if [[ -n "${previous_tag}" ]]; then
+              git log --pretty=format:'- %s (%h)' "${previous_tag}..HEAD"
+            else
+              git log --pretty=format:'- %s (%h)'
+            fi
+          } > release-notes.md
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/*
+          if-no-files-found: error
+
+      - name: Publish NuGet packages
+        shell: bash
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [[ -z "${NUGET_API_KEY}" ]]; then
+            echo "::error::NUGET_API_KEY secret is required to publish packages."
+            exit 1
+          fi
+
+          shopt -s nullglob
+          packages=(artifacts/*.nupkg)
+
+          if [[ "${#packages[@]}" -eq 0 ]]; then
+            echo "::error::No NuGet packages were produced."
+            exit 1
+          fi
+
+          for package in "${packages[@]}"; do
+            dotnet nuget push "${package}" --api-key "${NUGET_API_KEY}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body_path: release-notes.md
+          files: artifacts/*

@@ -16,9 +16,9 @@ This file defines how AI agents work in this solution.
 ## Solution Topology
 
 - Solution root: `.`
-- Solution file: `ManagedCode.FeatureChecker.sln`
-- Production project: `ManagedCode.FeatureChecker/`
-- Test project: `ManagedCode.FeatureChecker.Tests/`
+- Solution file: `ManagedCode.FeatureChecker.slnx`
+- Production project: `ManagedCode.FeatureChecker/`, organized by vertical slices with folder-aligned namespaces.
+- Test project: `ManagedCode.FeatureChecker.Tests/`, mirroring production slices.
 - Architecture map: `docs/Architecture.md`
 - Agent skills: `.codex/skills/`
 
@@ -70,12 +70,12 @@ Skill management rules:
 
 ## Commands
 
-- `restore`: `dotnet restore ManagedCode.FeatureChecker.sln`
-- `build`: `dotnet build ManagedCode.FeatureChecker.sln --configuration Release --no-restore`
-- `test`: `dotnet test --solution ManagedCode.FeatureChecker.sln --configuration Release --verbosity normal`
-- `format`: `dotnet format ManagedCode.FeatureChecker.sln --verify-no-changes`
-- `analyze`: `dotnet build ManagedCode.FeatureChecker.sln --configuration Release -p:RunAnalyzers=true`
-- `coverage`: `dotnet test --solution ManagedCode.FeatureChecker.sln --configuration Release -- --coverage --coverage-output-format cobertura`
+- `restore`: `dotnet restore ManagedCode.FeatureChecker.slnx`
+- `build`: `dotnet build ManagedCode.FeatureChecker.slnx --configuration Release --no-restore`
+- `test`: `dotnet test --solution ManagedCode.FeatureChecker.slnx --configuration Release --verbosity normal`
+- `format`: `dotnet format ManagedCode.FeatureChecker.slnx --verify-no-changes`
+- `analyze`: `dotnet build ManagedCode.FeatureChecker.slnx --configuration Release -p:RunAnalyzers=true`
+- `coverage`: `dotnet test --solution ManagedCode.FeatureChecker.slnx --configuration Release -- --coverage --coverage-output-format cobertura`
 
 .NET specifics:
 
@@ -129,7 +129,7 @@ Local `AGENTS.md` files may tighten these values. They must not loosen them with
 - SOLID, SRP, cohesion, and composition over inheritance are default design rules.
 - Keep public API changes intentional, documented, and covered by tests.
 - Avoid hardcoded values and magic literals in implementation code. Prefer named constants, enums, options, or value objects.
-- Remove obsolete code when replacing an implementation. Do not leave shims or fallback paths unless an explicit temporary exception documents the owner, scope, verification, and removal plan.
+- Remove obsolete code when replacing an implementation. Do not leave compatibility shims, dead code, mock implementations, or hidden fallback paths.
 - Do not add runtime dependencies to the core library without a documented reason.
 
 ## Release and Source Control
@@ -144,4 +144,11 @@ Local `AGENTS.md` files may tighten these values. They must not loosen them with
 
 ### Likes
 
+- Prefer the new best FeatureChecker API over preserving old compatibility. Legacy API, compatibility shims, dead code, mock implementations, and hidden fallback paths are forbidden. Keep only current production API and explicit caller-provided default values where the public API requires a safe missing-value contract.
+
 ### Dislikes
+
+- Legacy compatibility layers.
+- Dead code.
+- Mock implementations in production code.
+- Hidden fallback behavior.

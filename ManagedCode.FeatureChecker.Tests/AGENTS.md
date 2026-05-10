@@ -10,8 +10,16 @@ Parent: `../AGENTS.md`
 
 ## Entry Points
 
-- `Tests.cs` - TUnit tests for feature status lookup and filtering.
-- `MyEnum.cs` - test enum fixture.
+- `Access/FeatureAccessTests.cs` - factory, builder-interface, scope, and file-backed freshness tests.
+- `DependencyInjection/FeatureCheckerDependencyInjectionTests.cs` - Microsoft.Extensions configuration and service registration tests.
+- `Evaluation/FeatureCheckerEvaluationTests.cs` - evaluator, dependencies, variants, typed values, and evaluation collection tests.
+- `Segments/FeatureSegmentTests.cs` - list and rule-based segment tests.
+- `Storage/FeatureStorageTests.cs` - snapshot serialization and file-backed provider tests.
+- `Targeting/FeatureConditionOperatorTests.cs` - positive, negative, missing-attribute, and version condition operator tests.
+- `Targeting/FeatureEvaluationContextTests.cs` - context and context-builder attribute conversion tests.
+- `Targeting/FeatureTargetingTests.cs` - context rules, individual targets, and version rule tests.
+- `Targeting/FeatureRolloutAndVariationTests.cs` - rollout, off-variation, and fallthrough-variation tests.
+- `GlobalUsings.cs` - test-only namespace imports and aliases.
 - `ManagedCode.FeatureChecker.Tests.csproj` - test dependencies, project reference, and coverage collector.
 
 ## Boundaries
@@ -23,9 +31,9 @@ Parent: `../AGENTS.md`
 ## Project Commands
 
 - `build`: `dotnet build ManagedCode.FeatureChecker.Tests/ManagedCode.FeatureChecker.Tests.csproj --configuration Release`
-- `test`: `dotnet test ManagedCode.FeatureChecker.Tests/ManagedCode.FeatureChecker.Tests.csproj --configuration Release --verbosity normal`
-- `coverage`: `dotnet test ManagedCode.FeatureChecker.Tests/ManagedCode.FeatureChecker.Tests.csproj --configuration Release -- --coverage --coverage-output-format cobertura`
-- `format`: `dotnet format ManagedCode.FeatureChecker.sln --verify-no-changes`
+- `test`: `dotnet test --project ManagedCode.FeatureChecker.Tests/ManagedCode.FeatureChecker.Tests.csproj --configuration Release --verbosity normal`
+- `coverage`: `dotnet test --project ManagedCode.FeatureChecker.Tests/ManagedCode.FeatureChecker.Tests.csproj --configuration Release -- --coverage --coverage-output-format cobertura`
+- `format`: `dotnet format ManagedCode.FeatureChecker.slnx --verify-no-changes`
 - `analyze`: `dotnet build ManagedCode.FeatureChecker.Tests/ManagedCode.FeatureChecker.Tests.csproj --configuration Release -p:RunAnalyzers=true`
 
 .NET specifics:
@@ -55,6 +63,8 @@ Parent: `../AGENTS.md`
 
 ## Local Rules
 
+- Keep test namespaces aligned with vertical-slice folders under `ManagedCode.FeatureChecker.Tests.<Slice>`.
+- Keep TUnit test methods as instance methods. The root `.editorconfig` disables Meziantou `MA0038` for this project because it conflicts with TUnit `TUnit0048`.
 - Prefer meaningful assertions over count-only tests.
-- Cover unknown features, all feature states, and status filtering when feature semantics change.
+- Cover unknown features, all feature states, status filtering, targeting rules, scope helpers, and typed default-value semantics when feature semantics change.
 - Do not weaken assertions to fit an implementation change.

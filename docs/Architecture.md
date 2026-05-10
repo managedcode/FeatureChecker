@@ -1,13 +1,14 @@
 # FeatureChecker Architecture
 
-Goal: understand what exists, where it lives, and how the library is verified.
+Goal: understand the public contracts, evaluation model, storage boundary, and release verification flow.
 
 ## Summary
 
-- System: a small .NET library for enum-based feature status checks.
-- Code: `ManagedCode.FeatureChecker/` contains the packageable library; `ManagedCode.FeatureChecker.Tests/` contains TUnit tests.
-- Entry points: `IFeatureChecker`, `FeatureChecker`, `FeatureHolder`, and `FeatureStatus`.
-- Dependencies: the production project has no runtime package dependencies beyond the shared build packages from `Directory.Build.props`; tests use TUnit, Shouldly, and coverlet.
+- System: a provider-agnostic .NET feature flag evaluator.
+- Code: `ManagedCode.FeatureChecker/` contains the packageable library as vertical slices; `ManagedCode.FeatureChecker.Tests/` mirrors those slices with TUnit tests.
+- Platform entry points: `IFeatureEvaluator`, `IFeatureSetBuilder`, `IFeatureCheckerFactory`, `IFeatureScope`, `FeatureEvaluationContext`, `FeatureDefinition`, `FeatureSnapshot`, `FeatureSnapshotSerializer`, and `FeatureSetBuilder`.
+- Evaluation capabilities: individual targets, segments, context rules, version rules, dependencies, fallthrough/off variations, weighted rollouts, typed variation details, and evaluation reasons.
+- Dependencies: production code uses small Microsoft.Extensions packages for DI/options/configuration integration; tests use TUnit, Shouldly, and coverage tooling.
 
 ## Scoping
 
@@ -24,10 +25,21 @@ Goal: understand what exists, where it lives, and how the library is verified.
 flowchart LR
   Consumer["Consumer application"]
   Library["ManagedCode.FeatureChecker"]
+  Provider["IFeatureDefinitionProvider"]
+  Factory["IFeatureCheckerFactory"]
+  Scope["IFeatureScope"]
+  Snapshot["FeatureSnapshot JSON"]
+  Storage["Storage or cloud adapter"]
   Tests["ManagedCode.FeatureChecker.Tests"]
   Package["NuGet package"]
 
   Consumer -->|"calls public API"| Library
+  Consumer -->|"requests scoped access"| Factory
+  Factory -->|"creates"| Scope
+  Scope -->|"delegates evaluation"| Library
+  Library -->|"reads definitions from"| Provider
+  Provider -->|"loads"| Snapshot
+  Storage -->|"persists"| Snapshot
   Tests -->|"verifies public API"| Library
   Library -->|"packs as"| Package
 ```
@@ -37,37 +49,55 @@ flowchart LR
 ```mermaid
 flowchart LR
   Caller["Caller"]
-  Contract["IFeatureChecker"]
+  Evaluator["IFeatureEvaluator"]
+  Factory["IFeatureCheckerFactory"]
+  Scope["IFeatureScope"]
   Checker["FeatureChecker"]
-  Holder["FeatureHolder"]
+  Definition["FeatureDefinition"]
+  Context["FeatureEvaluationContext"]
+  Evaluation["FeatureEvaluation"]
   Status["FeatureStatus"]
 
-  Caller -->|"queries"| Contract
-  Checker -.->|"implements"| Contract
-  Checker -->|"reads copy of"| Holder
-  Holder -->|"maps Enum to"| Status
+  Caller -->|"string-key queries"| Evaluator
+  Caller -->|"request scoped checker"| Factory
+  Factory -->|"creates"| Evaluator
+  Factory -->|"creates"| Scope
+  Scope -->|"binds"| Context
+  Scope -->|"uses"| Evaluator
+  Checker -.->|"implements"| Evaluator
+  Checker -->|"evaluates"| Definition
+  Caller -->|"passes"| Context
+  Checker -->|"returns"| Evaluation
 ```
 
-### Key Types
+### Evaluation Model
 
 ```mermaid
-classDiagram
-  class IFeatureChecker {
-    Count
-    IsFeatureExists()
-    IsEnabled()
-    IsDisabled()
-    IsDebug()
-    TryGetFeatureStatus()
-    GetFeaturesByStatus()
-  }
-  class FeatureChecker
-  class FeatureHolder
-  class FeatureStatus
+flowchart TD
+  Start["Evaluate(featureKey, context)"]
+  Missing["Missing feature"]
+  Off["Off variation"]
+  Dependencies["Evaluate dependencies"]
+  Targets["Individual target"]
+  Rule["First matching rule"]
+  Fallthrough["Fallthrough or weighted variant"]
+  Default["Default status and value"]
+  Result["FeatureEvaluation"]
 
-  IFeatureChecker <|.. FeatureChecker
-  FeatureChecker --> FeatureHolder : copies data from
-  FeatureHolder --> FeatureStatus : stores values
+  Start -->|"not found"| Missing
+  Start -->|"targeting off"| Off
+  Start -->|"found"| Dependencies
+  Dependencies -->|"failed"| Result
+  Dependencies -->|"passed"| Targets
+  Targets -->|"matched"| Result
+  Targets -->|"not matched"| Rule
+  Rule -->|"matched"| Result
+  Rule -->|"not matched"| Fallthrough
+  Fallthrough -->|"selected"| Result
+  Fallthrough -->|"none selected"| Default
+  Default --> Result
+  Missing --> Result
+  Off --> Result
 ```
 
 ## Navigation Index
@@ -78,37 +108,37 @@ classDiagram
 - `ManagedCode.FeatureChecker.Tests` - code: [ManagedCode.FeatureChecker.Tests/](../ManagedCode.FeatureChecker.Tests/); local rules: [ManagedCode.FeatureChecker.Tests/AGENTS.md](../ManagedCode.FeatureChecker.Tests/AGENTS.md).
 - `GitHub Actions` - workflows: [.github/workflows/](../.github/workflows/).
 
-### Interfaces and Contracts
+### Vertical Slice File Inventory
 
-- `IFeatureChecker` - source: [IFeatureChecker.cs](../ManagedCode.FeatureChecker/IFeatureChecker.cs); implemented by `FeatureChecker`.
-- `FeatureHolder` - source: [FeatureHolder.cs](../ManagedCode.FeatureChecker/FeatureHolder.cs); maps `Enum` keys to `FeatureStatus`.
-- `FeatureStatus` - source: [FeatureStatus.cs](../ManagedCode.FeatureChecker/FeatureStatus.cs); defines `Disabled`, `Enabled`, and `Debug`.
+- `Access` - namespace `ManagedCode.FeatureChecker.Access`; sources: [FeatureCheckerFactory.cs](../ManagedCode.FeatureChecker/Access/FeatureCheckerFactory.cs), [FeatureCheckerFactoryExtensions.cs](../ManagedCode.FeatureChecker/Access/FeatureCheckerFactoryExtensions.cs), [FeatureScope.cs](../ManagedCode.FeatureChecker/Access/FeatureScope.cs), [IFeatureCheckerFactory.cs](../ManagedCode.FeatureChecker/Access/IFeatureCheckerFactory.cs), [IFeatureScope.cs](../ManagedCode.FeatureChecker/Access/IFeatureScope.cs); tests: [FeatureAccessTests.cs](../ManagedCode.FeatureChecker.Tests/Access/FeatureAccessTests.cs).
+- `Definitions` - namespace `ManagedCode.FeatureChecker.Definitions`; sources: [FeatureDefinition.cs](../ManagedCode.FeatureChecker/Definitions/FeatureDefinition.cs), [FeatureDefinitionBuilder.cs](../ManagedCode.FeatureChecker/Definitions/FeatureDefinitionBuilder.cs), [FeatureDependency.cs](../ManagedCode.FeatureChecker/Definitions/FeatureDependency.cs), [FeatureMode.cs](../ManagedCode.FeatureChecker/Definitions/FeatureMode.cs), [FeatureSetBuilder.cs](../ManagedCode.FeatureChecker/Definitions/FeatureSetBuilder.cs), [FeatureStatus.cs](../ManagedCode.FeatureChecker/Definitions/FeatureStatus.cs), [FeatureVariant.cs](../ManagedCode.FeatureChecker/Definitions/FeatureVariant.cs), [IFeatureDefinitionBuilder.cs](../ManagedCode.FeatureChecker/Definitions/IFeatureDefinitionBuilder.cs), [IFeatureSetBuilder.cs](../ManagedCode.FeatureChecker/Definitions/IFeatureSetBuilder.cs); tests are covered through access, evaluation, targeting, segments, and storage slices.
+- `DependencyInjection` - namespace `ManagedCode.FeatureChecker.DependencyInjection`; source: [FeatureCheckerServiceCollectionExtensions.cs](../ManagedCode.FeatureChecker/DependencyInjection/FeatureCheckerServiceCollectionExtensions.cs); tests: [FeatureCheckerDependencyInjectionTests.cs](../ManagedCode.FeatureChecker.Tests/DependencyInjection/FeatureCheckerDependencyInjectionTests.cs).
+- `Evaluation` - namespace `ManagedCode.FeatureChecker.Evaluation`; sources: [FeatureChecker.cs](../ManagedCode.FeatureChecker/Evaluation/FeatureChecker.cs), [FeatureEvaluation.cs](../ManagedCode.FeatureChecker/Evaluation/FeatureEvaluation.cs), [FeatureEvaluationEngine.cs](../ManagedCode.FeatureChecker/Evaluation/FeatureEvaluationEngine.cs), [FeatureEvaluationFactory.cs](../ManagedCode.FeatureChecker/Evaluation/FeatureEvaluationFactory.cs), [FeatureEvaluationReasonKind.cs](../ManagedCode.FeatureChecker/Evaluation/FeatureEvaluationReasonKind.cs), [FeatureEvaluationReasons.cs](../ManagedCode.FeatureChecker/Evaluation/FeatureEvaluationReasons.cs), [FeatureEvaluatorExtensions.cs](../ManagedCode.FeatureChecker/Evaluation/FeatureEvaluatorExtensions.cs), [FeatureVariationDetail.cs](../ManagedCode.FeatureChecker/Evaluation/FeatureVariationDetail.cs), [IFeatureEvaluator.cs](../ManagedCode.FeatureChecker/Evaluation/IFeatureEvaluator.cs); tests: [FeatureCheckerEvaluationTests.cs](../ManagedCode.FeatureChecker.Tests/Evaluation/FeatureCheckerEvaluationTests.cs).
+- `Segments` - namespace `ManagedCode.FeatureChecker.Segments`; sources: [FeatureSegment.cs](../ManagedCode.FeatureChecker/Segments/FeatureSegment.cs), [FeatureSegmentBuilder.cs](../ManagedCode.FeatureChecker/Segments/FeatureSegmentBuilder.cs), [FeatureSegmentMatcher.cs](../ManagedCode.FeatureChecker/Segments/FeatureSegmentMatcher.cs), [IFeatureSegmentProvider.cs](../ManagedCode.FeatureChecker/Segments/IFeatureSegmentProvider.cs); tests: [FeatureSegmentTests.cs](../ManagedCode.FeatureChecker.Tests/Segments/FeatureSegmentTests.cs).
+- `Storage` - namespace `ManagedCode.FeatureChecker.Storage`; sources: [FeatureCheckerOptions.cs](../ManagedCode.FeatureChecker/Storage/FeatureCheckerOptions.cs), [FeatureFileProvider.cs](../ManagedCode.FeatureChecker/Storage/FeatureFileProvider.cs), [FeatureSnapshot.cs](../ManagedCode.FeatureChecker/Storage/FeatureSnapshot.cs), [FeatureSnapshotProvider.cs](../ManagedCode.FeatureChecker/Storage/FeatureSnapshotProvider.cs), [FeatureSnapshotSerializer.cs](../ManagedCode.FeatureChecker/Storage/FeatureSnapshotSerializer.cs), [IFeatureDefinitionProvider.cs](../ManagedCode.FeatureChecker/Storage/IFeatureDefinitionProvider.cs), [OptionsFeatureDefinitionProvider.cs](../ManagedCode.FeatureChecker/Storage/OptionsFeatureDefinitionProvider.cs); tests: [FeatureStorageTests.cs](../ManagedCode.FeatureChecker.Tests/Storage/FeatureStorageTests.cs).
+- `Targeting` - namespace `ManagedCode.FeatureChecker.Targeting`; sources: [FeatureCondition.cs](../ManagedCode.FeatureChecker/Targeting/FeatureCondition.cs), [FeatureConditionOperator.cs](../ManagedCode.FeatureChecker/Targeting/FeatureConditionOperator.cs), [FeatureContextAttributeNames.cs](../ManagedCode.FeatureChecker/Targeting/FeatureContextAttributeNames.cs), [FeatureContextKinds.cs](../ManagedCode.FeatureChecker/Targeting/FeatureContextKinds.cs), [FeatureEvaluationContext.cs](../ManagedCode.FeatureChecker/Targeting/FeatureEvaluationContext.cs), [FeatureEvaluationContextBuilder.cs](../ManagedCode.FeatureChecker/Targeting/FeatureEvaluationContextBuilder.cs), [FeatureRollout.cs](../ManagedCode.FeatureChecker/Targeting/FeatureRollout.cs), [FeatureRuleMatch.cs](../ManagedCode.FeatureChecker/Targeting/FeatureRuleMatch.cs), [FeatureTarget.cs](../ManagedCode.FeatureChecker/Targeting/FeatureTarget.cs), [FeatureTargetingRule.cs](../ManagedCode.FeatureChecker/Targeting/FeatureTargetingRule.cs); tests: [FeatureConditionOperatorTests.cs](../ManagedCode.FeatureChecker.Tests/Targeting/FeatureConditionOperatorTests.cs), [FeatureEvaluationContextTests.cs](../ManagedCode.FeatureChecker.Tests/Targeting/FeatureEvaluationContextTests.cs), [FeatureTargetingTests.cs](../ManagedCode.FeatureChecker.Tests/Targeting/FeatureTargetingTests.cs), [FeatureRolloutAndVariationTests.cs](../ManagedCode.FeatureChecker.Tests/Targeting/FeatureRolloutAndVariationTests.cs).
+- `Test globals` - namespace imports and the `FeatureCheckerEvaluator` test alias live in [GlobalUsings.cs](../ManagedCode.FeatureChecker.Tests/GlobalUsings.cs).
 - `Package metadata` - source: [Directory.Build.props](../Directory.Build.props) and [ManagedCode.FeatureChecker.csproj](../ManagedCode.FeatureChecker/ManagedCode.FeatureChecker.csproj).
-
-### Key Types
-
-- `FeatureChecker` - source: [FeatureChecker.cs](../ManagedCode.FeatureChecker/FeatureChecker.cs); default checker implementation.
-- `IFeatureChecker` - source: [IFeatureChecker.cs](../ManagedCode.FeatureChecker/IFeatureChecker.cs); public abstraction.
-- `FeatureHolder` - source: [FeatureHolder.cs](../ManagedCode.FeatureChecker/FeatureHolder.cs); mutable setup holder copied by the checker.
-- `FeatureStatus` - source: [FeatureStatus.cs](../ManagedCode.FeatureChecker/FeatureStatus.cs); public feature state enum.
 
 ## Dependency Rules
 
-- Production code should stay dependency-light and provider-agnostic.
+- Production code should stay provider-agnostic. Microsoft.Extensions dependencies are allowed for documented .NET host integration.
 - Tests may depend on TUnit, Shouldly, and coverage tooling.
-- Storage, cloud, release-provider, or feature-provider integrations should be isolated behind explicit contracts before being added.
+- Storage, cloud, release-provider, or feature-provider integrations should be isolated behind `IFeatureDefinitionProvider` and `FeatureSnapshot` before being added.
 - Shared build policy lives in `Directory.Build.props` and `Directory.Packages.props`.
 
 ## Key Decisions
 
-- No ADRs exist yet.
+- The core package owns deterministic local evaluation and JSON snapshots.
+- Vendor, cloud, edge, and ManagedCode.Storage integrations should be separate adapter packages unless a later ADR changes the package boundary.
+- GitHub's default CodeQL setup is the code-scanning owner; the checked-in advanced CodeQL workflow was removed to avoid duplicate setup failures.
 - Add ADRs under `docs/ADR/` for public API model changes, provider architecture, release policy shifts, or new runtime dependencies.
+- Current core-boundary ADR: [ADR 0001](ADR/0001-core-feature-boundary.md).
 
 ## Where To Go Next
 
 - Root governance: [AGENTS.md](../AGENTS.md)
 - Production project rules: [ManagedCode.FeatureChecker/AGENTS.md](../ManagedCode.FeatureChecker/AGENTS.md)
 - Test project rules: [ManagedCode.FeatureChecker.Tests/AGENTS.md](../ManagedCode.FeatureChecker.Tests/AGENTS.md)
-- Behaviour docs: `docs/Features/`
+- Behaviour docs: [docs/Features/feature-evaluation.md](Features/feature-evaluation.md), [docs/Features/feature-access-layer.md](Features/feature-access-layer.md), and [docs/Features/feature-sdk-capabilities.md](Features/feature-sdk-capabilities.md)
 - Architecture decisions: `docs/ADR/`
-

@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/Tests/">
+    <Project Path="ManagedCode.FeatureChecker.Tests/ManagedCode.FeatureChecker.Tests.csproj" />
+  </Folder>
+  <Project Path="ManagedCode.FeatureChecker/ManagedCode.FeatureChecker.csproj" />
+</Solution>

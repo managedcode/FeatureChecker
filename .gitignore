@@ -33,7 +33,13 @@ e2e/*.map
 
 # System Files
 .DS_Store/
-.codex/
+.codex/*
+!.codex/skills/
+!.codex/skills/**
+
+# Agent planning artifacts
+*.brainstorm.md
+*.plan.md
 
 ### ASPNETCore ###
 ## Ignore Visual Studio temporary files, build results, and

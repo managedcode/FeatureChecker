@@ -7,8 +7,15 @@
   <PropertyGroup>
     <Title>ManagedCode.FeatureChecker</Title>
     <PackageId>ManagedCode.FeatureChecker</PackageId>
-    <Description>Small feature flag checker for enum-based application feature contracts.</Description>
-    <PackageTags>managedcode;feature-flags;feature-checker;dotnet</PackageTags>
+    <Description>Provider-agnostic .NET feature flag SDK for feature management, targeting, segments, percentage rollouts, variants, remote config, JSON snapshots, and Microsoft.Extensions integration.</Description>
+    <PackageTags>managedcode;feature-flags;feature-toggle;feature-management;feature-checker;dotnet;csharp;targeting;segments;rollout;percentage-rollout;variants;remote-config;ab-testing;json;microsoft-extensions</PackageTags>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+  </ItemGroup>
 
 </Project>
