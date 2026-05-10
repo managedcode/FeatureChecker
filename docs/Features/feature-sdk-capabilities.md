@@ -21,6 +21,7 @@ This feature slice adds SDK-side capabilities that are useful inside .NET applic
 | Evaluation details | `FeatureEvaluation.ReasonKind`, `VariationIndex`, `Rule` |
 | Typed details | `StringVariationDetail`, `BoolVariationDetail`, `IntVariationDetail`, `DoubleVariationDetail` |
 | .NET host integration | `AddFeatureChecker(IConfiguration)` and `AddFeatureChecker(Action<FeatureCheckerOptions>)` |
+| Backend snapshot integration | `IFeatureSnapshotSource`, `FeatureSnapshotSourceProvider`, and `AddFeatureCheckerSnapshotSource<TSource>()` |
 
 ## Evaluation Order
 

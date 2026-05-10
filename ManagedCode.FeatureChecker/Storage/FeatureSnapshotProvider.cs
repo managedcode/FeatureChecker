@@ -3,7 +3,7 @@ using ManagedCode.FeatureChecker.Segments;
 
 namespace ManagedCode.FeatureChecker.Storage;
 
-public sealed class FeatureSnapshotProvider : IFeatureDefinitionProvider, IFeatureSegmentProvider
+public sealed class FeatureSnapshotProvider : IFeatureDefinitionProvider, IFeatureSegmentProvider, IFeatureSnapshotSource
 {
     private readonly FeatureSnapshot _snapshot;
 
@@ -14,11 +14,16 @@ public sealed class FeatureSnapshotProvider : IFeatureDefinitionProvider, IFeatu
 
     public IReadOnlyCollection<FeatureDefinition> GetFeatureDefinitions()
     {
-        return _snapshot.Features;
+        return GetSnapshot().Features;
     }
 
     public IReadOnlyCollection<FeatureSegment> GetFeatureSegments()
     {
-        return _snapshot.Segments;
+        return GetSnapshot().Segments;
+    }
+
+    public FeatureSnapshot GetSnapshot()
+    {
+        return _snapshot;
     }
 }

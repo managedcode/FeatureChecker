@@ -57,4 +57,6 @@ The core package serializes `FeatureSnapshot` to JSON strings, streams, and file
 - external feature/configuration sync jobs
 - edge cache refresh jobs
 
-Adapters should fetch and persist snapshots, then pass definitions into `FeatureChecker` through `FeatureSnapshot`, `FeatureFileProvider`, or `IFeatureDefinitionProvider`.
+Adapters should fetch and persist snapshots, then pass definitions into `FeatureChecker` through `FeatureSnapshot`, `FeatureFileProvider`, `IFeatureSnapshotSource`, or `IFeatureDefinitionProvider`.
+
+Use `IFeatureSnapshotSource` when a backend can provide a complete snapshot. It keeps features and segments from the same source version and lets application code refresh by creating fresh evaluators or scopes through `IFeatureCheckerFactory`.

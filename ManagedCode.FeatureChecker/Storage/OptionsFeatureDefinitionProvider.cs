@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace ManagedCode.FeatureChecker.Storage;
 
-public sealed class OptionsFeatureDefinitionProvider : IFeatureDefinitionProvider, IFeatureSegmentProvider
+public sealed class OptionsFeatureDefinitionProvider : IFeatureDefinitionProvider, IFeatureSegmentProvider, IFeatureSnapshotSource
 {
     private readonly IOptionsMonitor<FeatureCheckerOptions> _options;
 
@@ -23,7 +23,7 @@ public sealed class OptionsFeatureDefinitionProvider : IFeatureDefinitionProvide
         return GetSnapshot().Segments;
     }
 
-    private FeatureSnapshot GetSnapshot()
+    public FeatureSnapshot GetSnapshot()
     {
         var options = _options.CurrentValue;
 

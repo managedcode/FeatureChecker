@@ -19,11 +19,20 @@ public class FeatureChecker : IFeatureEvaluator
     {
         ArgumentNullException.ThrowIfNull(provider);
 
-        var segments = provider is IFeatureSegmentProvider segmentProvider
-            ? segmentProvider.GetFeatureSegments()
-            : [];
+        if (provider is IFeatureSnapshotSource snapshotSource)
+        {
+            var snapshot = snapshotSource.GetSnapshot();
+            var snapshotMaps = CreateMaps(snapshot.Features, snapshot.Segments);
 
-        var maps = CreateMaps(provider.GetFeatureDefinitions(), segments);
+            _features = snapshotMaps.Features;
+            _engine = new FeatureEvaluationEngine(snapshotMaps.Features, snapshotMaps.Segments);
+
+            return;
+        }
+
+        var maps = CreateMaps(
+            provider.GetFeatureDefinitions(),
+            provider is IFeatureSegmentProvider segmentProvider ? segmentProvider.GetFeatureSegments() : []);
         _features = maps.Features;
         _engine = new FeatureEvaluationEngine(maps.Features, maps.Segments);
     }

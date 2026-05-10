@@ -44,6 +44,19 @@ public sealed class FeatureAccessTests
     }
 
     [Test]
+    public void FeatureCheckerFactory_ShouldIssueFreshCheckersFromSnapshotSource()
+    {
+        var source = new MutableFeatureSnapshotSource(FeatureStatus.Disabled);
+        var factory = new FeatureCheckerFactory(new FeatureSnapshotSourceProvider(source));
+
+        factory.Create().IsDisabled(FeatureNames.MarketplaceConnect).ShouldBeTrue();
+
+        source.Replace(FeatureStatus.Enabled);
+
+        factory.Create().IsEnabled(FeatureNames.MarketplaceConnect).ShouldBeTrue();
+    }
+
+    [Test]
     public void FeatureCheckerFactory_ShouldCreateUserTenantAndSessionScopesForControllerCode()
     {
         var builder = new FeatureSetBuilder();
@@ -95,10 +108,15 @@ public sealed class FeatureAccessTests
     {
         FeatureSnapshotSerializer.Save(
             path,
-            FeatureSnapshot.FromDefinitions(
-                [
-                    FeatureDefinition.Create(FeatureNames.MarketplaceConnect, status)
-                ]));
+            CreateSnapshot(status));
+    }
+
+    private static FeatureSnapshot CreateSnapshot(FeatureStatus status)
+    {
+        return FeatureSnapshot.FromDefinitions(
+            [
+                FeatureDefinition.Create(FeatureNames.MarketplaceConnect, status)
+            ]);
     }
 
     private static string CreateTempJsonPath()
@@ -154,5 +172,25 @@ public sealed class FeatureAccessTests
     {
         public const string TrueValue = "true";
         public const string FalseValue = "false";
+    }
+
+    private sealed class MutableFeatureSnapshotSource : IFeatureSnapshotSource
+    {
+        private FeatureSnapshot _snapshot;
+
+        public MutableFeatureSnapshotSource(FeatureStatus status)
+        {
+            _snapshot = CreateSnapshot(status);
+        }
+
+        public FeatureSnapshot GetSnapshot()
+        {
+            return _snapshot;
+        }
+
+        public void Replace(FeatureStatus status)
+        {
+            _snapshot = CreateSnapshot(status);
+        }
     }
 }

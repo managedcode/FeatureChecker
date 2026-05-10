@@ -54,6 +54,52 @@ public sealed class FeatureStorageTests
         }
     }
 
+    [Test]
+    public void FeatureFileProvider_ShouldLoadFullSnapshotWithSegments()
+    {
+        var snapshot = new FeatureSnapshot
+        {
+            Features =
+            [
+                new FeatureDefinition
+                {
+                    Key = FeatureNames.MarketplaceConnect,
+                    Status = FeatureStatus.Disabled,
+                    Rules =
+                    [
+                        new FeatureTargetingRule
+                        {
+                            IncludeSegments = [SegmentNames.EnterpriseUsers],
+                            Status = FeatureStatus.Enabled
+                        }
+                    ]
+                }
+            ],
+            Segments =
+            [
+                new FeatureSegment
+                {
+                    Key = SegmentNames.EnterpriseUsers,
+                    IncludedKeys = [TargetingKeys.UserA]
+                }
+            ]
+        };
+        var path = CreateTempJsonPath();
+
+        try
+        {
+            FeatureSnapshotSerializer.Save(path, snapshot);
+            var checker = new FeatureCheckerEvaluator(new FeatureFileProvider(path));
+            var context = FeatureEvaluationContextBuilder.Create().ForUser(TargetingKeys.UserA).Build();
+
+            checker.IsEnabled(FeatureNames.MarketplaceConnect, context).ShouldBeTrue();
+        }
+        finally
+        {
+            DeleteFile(path);
+        }
+    }
+
     private static string CreateTempJsonPath()
     {
         return Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.json");
@@ -71,6 +117,16 @@ public sealed class FeatureStorageTests
     {
         public const string MarketplaceConnect = "marketplace.connect";
         public const string RetiredExport = "retired.export";
+    }
+
+    private static class SegmentNames
+    {
+        public const string EnterpriseUsers = "enterprise-users";
+    }
+
+    private static class TargetingKeys
+    {
+        public const string UserA = "user-a";
     }
 
     private static class DefaultValues

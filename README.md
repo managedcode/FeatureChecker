@@ -74,6 +74,7 @@ Percentage rollout is deterministic and sticky for the same feature key and targ
 | `IFeatureEvaluator` | Main application-facing evaluation contract. |
 | `IFeatureCheckerFactory` | Creates fresh evaluators or scoped checkers from a definition provider. |
 | `IFeatureDefinitionProvider` | Storage boundary for JSON files, databases, object storage, cloud adapters, or custom providers. |
+| `IFeatureSnapshotSource` | Full-snapshot backend boundary when features and segments are loaded together. |
 
 ## Feature Modes
 
@@ -308,9 +309,38 @@ builder.Services.AddFeatureChecker(options =>
 });
 ```
 
+Register a backend snapshot source when feature configuration is assembled outside the application:
+
+```csharp
+using ManagedCode.FeatureChecker.DependencyInjection;
+using ManagedCode.FeatureChecker.Storage;
+
+builder.Services.AddFeatureCheckerSnapshotSource<DatabaseFeatureSnapshotSource>();
+
+public sealed class DatabaseFeatureSnapshotSource : IFeatureSnapshotSource
+{
+    public FeatureSnapshot GetSnapshot()
+    {
+        // Load the latest snapshot from a table, API, object store, cache, or control-plane export.
+        return FeatureSnapshotSerializer.Load("features.json");
+    }
+}
+```
+
+For runtime freshness, inject `IFeatureCheckerFactory` and create a new evaluator or scope after the source has refreshed its cache:
+
+```csharp
+var scope = factory.ForUser(userId, context => context.WithPlan(plan));
+
+if (scope.IsEnabled("checkout.new-flow"))
+{
+    // Run the enabled path.
+}
+```
+
 ## JSON Snapshots And Storage
 
-The core package deliberately avoids cloud SDK dependencies. Storage integration lives behind `FeatureSnapshot`, `FeatureSnapshotSerializer`, and `IFeatureDefinitionProvider`.
+The core package deliberately avoids cloud SDK dependencies. Storage integration lives behind `FeatureSnapshot`, `FeatureSnapshotSerializer`, `IFeatureSnapshotSource`, and `IFeatureDefinitionProvider`.
 
 ```csharp
 using ManagedCode.FeatureChecker.Definitions;
@@ -348,6 +378,8 @@ public sealed class MyFeatureProvider : IFeatureDefinitionProvider
     }
 }
 ```
+
+Prefer `IFeatureSnapshotSource` when your backend returns a complete snapshot including segments. Use `IFeatureDefinitionProvider` directly only when a feature-only provider is enough.
 
 ## Evaluation Reasons
 
