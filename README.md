@@ -1,7 +1,10 @@
 # ManagedCode.FeatureChecker
 
 [![CI](https://github.com/managedcode/FeatureChecker/actions/workflows/dotnet.yml/badge.svg)](https://github.com/managedcode/FeatureChecker/actions/workflows/dotnet.yml)
-[![NuGet](https://img.shields.io/nuget/v/ManagedCode.FeatureChecker.svg)](https://www.nuget.org/packages/ManagedCode.FeatureChecker)
+[![NuGet](https://img.shields.io/nuget/v/ManagedCode.FeatureChecker.svg?style=flat-square&logo=nuget)](https://www.nuget.org/packages/ManagedCode.FeatureChecker)
+[![Release](https://github.com/managedcode/FeatureChecker/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/managedcode/FeatureChecker/actions/workflows/release.yml)
+[![Downloads](https://img.shields.io/nuget/dt/ManagedCode.FeatureChecker.svg?style=flat-square&logo=nuget)](https://www.nuget.org/packages/ManagedCode.FeatureChecker)
+[![License](https://img.shields.io/github/license/managedcode/FeatureChecker.svg?style=flat-square)](LICENSE)
 
 `ManagedCode.FeatureChecker` is a provider-agnostic .NET feature flag SDK for feature management, feature toggles, targeting, segmentation, percentage rollouts, variants, remote configuration values, and deterministic local evaluation.
 
@@ -22,6 +25,8 @@ It is built for .NET developers who want a clean in-process API first: no dashbo
 feature flags, feature toggles, feature management, .NET SDK, C#, targeting, segmentation, percentage rollout, gradual rollout, variants, remote config, kill switch, A/B testing, experiments, permissions, migrations, JSON snapshots, Microsoft.Extensions, deterministic local evaluation.
 
 ## Install
+
+Install the latest stable release from [NuGet](https://www.nuget.org/packages/ManagedCode.FeatureChecker):
 
 ```bash
 dotnet add package ManagedCode.FeatureChecker
