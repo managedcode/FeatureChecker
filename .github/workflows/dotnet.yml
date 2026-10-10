@@ -14,7 +14,7 @@ env:
   DOTNET_VERSION: 10.0.x
   SOLUTION: ManagedCode.FeatureChecker.slnx
   COVERAGE_THRESHOLD: 85
-  COVERAGE_FILE: ManagedCode.FeatureChecker.Tests/bin/Release/net10.0/TestResults/coverage.cobertura.xml
+  COVERAGE_FILE: TestResults/coverage.cobertura.xml
 
 jobs:
   verify:
