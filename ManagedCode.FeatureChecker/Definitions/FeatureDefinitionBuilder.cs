@@ -157,11 +157,11 @@ public sealed class FeatureDefinitionBuilder : IFeatureDefinitionBuilder
             FallthroughValue = _fallthroughValue,
             OffVariant = _offVariant,
             OffValue = _offValue,
-            Targets = [.. _targets],
-            Rules = [.. _rules],
-            Dependencies = [.. _dependencies],
-            Variants = [.. _variants],
-            Metadata = new Dictionary<string, string>(_metadata, StringComparer.OrdinalIgnoreCase)
+            Targets = _targets,
+            Rules = _rules,
+            Dependencies = _dependencies,
+            Variants = _variants,
+            Metadata = _metadata
         };
     }
 

@@ -6,6 +6,46 @@ namespace ManagedCode.FeatureChecker.Tests.DependencyInjection;
 public sealed class FeatureCheckerDependencyInjectionTests
 {
     [Test]
+    public void ConfiguredOptions_DoNotAddSegmentsToAnExplicitProvider()
+    {
+        using var services = new ServiceCollection()
+            .AddFeatureCheckerProvider<StaticFeatureDefinitionProvider>()
+            .AddFeatureChecker(options => options.Snapshot = new FeatureSnapshot
+            {
+                Segments = [new FeatureSegment { Key = "unrelated" }]
+            })
+            .BuildServiceProvider();
+
+        services.GetRequiredService<IFeatureEvaluator>().IsEnabled(FeatureNames.Checkout).ShouldBeTrue();
+        services.GetService<IFeatureSegmentProvider>().ShouldBeNull();
+    }
+
+    [Test]
+    public void OptionsFileSource_ReportsMissingFileAndRecoversWhenItAppears()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, $"{Guid.NewGuid():N}.json");
+        using var services = new ServiceCollection()
+            .AddFeatureChecker(options =>
+            {
+                options.FilePath = path;
+                options.Snapshot = FeatureSnapshot.FromDefinitions([FeatureDefinition.Create(FeatureNames.Checkout, FeatureStatus.Disabled)]);
+            })
+            .BuildServiceProvider();
+        var factory = services.GetRequiredService<IFeatureCheckerFactory>();
+
+        Should.Throw<FileNotFoundException>(() => factory.Create());
+        try
+        {
+            FeatureSnapshotSerializer.Save(path, FeatureSnapshot.FromDefinitions([FeatureDefinition.Create(FeatureNames.Checkout, FeatureStatus.Enabled)]));
+            factory.Create().IsEnabled(FeatureNames.Checkout).ShouldBeTrue();
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
     public void ServiceCollection_ShouldRegisterFeatureCheckerFromConfiguration()
     {
         var configuration = new ConfigurationBuilder()

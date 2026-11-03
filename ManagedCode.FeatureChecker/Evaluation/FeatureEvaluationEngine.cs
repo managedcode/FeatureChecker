@@ -7,52 +7,98 @@ namespace ManagedCode.FeatureChecker.Evaluation;
 internal sealed class FeatureEvaluationEngine
 {
     private readonly IReadOnlyDictionary<string, FeatureDefinition> _features;
-    private readonly FeatureSegmentMatcher _segmentMatcher;
+    private readonly Func<string, FeatureEvaluationContext, bool?> _matchSegment;
 
     public FeatureEvaluationEngine(IReadOnlyDictionary<string, FeatureDefinition> features, IReadOnlyDictionary<string, FeatureSegment> segments)
     {
         _features = features;
-        _segmentMatcher = new FeatureSegmentMatcher(segments);
+        _matchSegment = new FeatureSegmentMatcher(segments).Matches;
     }
 
     public FeatureEvaluation Evaluate(string featureKey, FeatureEvaluationContext context)
-    {
-        return EvaluateCore(featureKey, context, []);
-    }
-
-    private FeatureEvaluation EvaluateCore(string featureKey, FeatureEvaluationContext context, HashSet<string> evaluationStack)
     {
         if (!_features.TryGetValue(featureKey, out var definition))
         {
             return FeatureEvaluationFactory.Missing(featureKey);
         }
 
-        if (!evaluationStack.Add(featureKey))
-        {
-            return FeatureEvaluationFactory.DependencyCycle(featureKey);
-        }
-
-        try
-        {
-            return EvaluateDefinition(definition, context, evaluationStack);
-        }
-        finally
-        {
-            evaluationStack.Remove(featureKey);
-        }
+        Dictionary<string, FeatureEvaluation?>? results = null;
+        return Evaluate(definition, context, ref results);
     }
 
-    private FeatureEvaluation EvaluateDefinition(FeatureDefinition definition, FeatureEvaluationContext context, HashSet<string> evaluationStack)
+    public FeatureEvaluation Evaluate(
+        FeatureDefinition definition,
+        FeatureEvaluationContext context,
+        ref Dictionary<string, FeatureEvaluation?>? results)
+    {
+        if (results?.TryGetValue(definition.Key, out var result) is true)
+        {
+            return result!;
+        }
+
+        return EvaluateLeaf(definition, context)
+            ?? EvaluateGraph(definition, context, results ??= new Dictionary<string, FeatureEvaluation?>(StringComparer.Ordinal));
+    }
+
+    private FeatureEvaluation? EvaluateLeaf(FeatureDefinition definition, FeatureEvaluationContext context)
     {
         if (!definition.TargetingEnabled)
         {
-            return FeatureEvaluationFactory.Off(definition);
+            return FeatureEvaluationFactory.Constant(definition);
         }
 
-        var dependencyFailure = EvaluateDependencies(definition, context, evaluationStack);
-        if (dependencyFailure is not null)
+        return definition.Dependencies.Count == 0 ? EvaluateDefinition(definition, context) : null;
+    }
+
+    private FeatureEvaluation EvaluateGraph(FeatureDefinition root, FeatureEvaluationContext context, Dictionary<string, FeatureEvaluation?> results)
+    {
+        // A null entry marks a feature on the current traversal path.
+        results.Add(root.Key, null);
+        var pending = new Stack<DependencyFrame>();
+        pending.Push(new DependencyFrame(root, 0));
+
+        while (pending.TryPop(out var frame))
         {
-            return dependencyFailure;
+            var definition = frame.Definition;
+            if (frame.Index == definition.Dependencies.Count)
+            {
+                results[definition.Key] = EvaluateDefinition(definition, context);
+                continue;
+            }
+
+            var dependency = definition.Dependencies[frame.Index];
+            if (!results.TryGetValue(dependency.Key, out var result))
+            {
+                if (!TryEvaluateDependency(dependency.Key, context, out var child, out result))
+                {
+                    results.Add(dependency.Key, null);
+                    pending.Push(frame);
+                    pending.Push(new DependencyFrame(child!, 0));
+                    continue;
+                }
+
+                results.Add(dependency.Key, result);
+            }
+
+            var failure = GetDependencyFailure(definition, dependency, result);
+            if (failure is null)
+            {
+                pending.Push(new DependencyFrame(definition, frame.Index + 1));
+            }
+            else
+            {
+                results[definition.Key] = failure;
+            }
+        }
+
+        return results[root.Key]!;
+    }
+
+    private FeatureEvaluation EvaluateDefinition(FeatureDefinition definition, FeatureEvaluationContext context)
+    {
+        if (definition.Targets.Count == 0 && definition.Rules.Count == 0 && definition.Variants.Count == 0)
+        {
+            return FeatureEvaluationFactory.Constant(definition);
         }
 
         var target = FindTarget(definition, context);
@@ -70,26 +116,25 @@ internal sealed class FeatureEvaluationEngine
         return FeatureEvaluationFactory.Fallthrough(definition, context);
     }
 
-    private FeatureEvaluation? EvaluateDependencies(FeatureDefinition definition, FeatureEvaluationContext context, HashSet<string> evaluationStack)
+    private bool TryEvaluateDependency(string key, FeatureEvaluationContext context, out FeatureDefinition? definition, out FeatureEvaluation? result)
     {
-        foreach (var dependency in definition.Dependencies)
+        result = _features.TryGetValue(key, out definition)
+            ? EvaluateLeaf(definition, context)
+            : FeatureEvaluationFactory.Missing(key);
+
+        return result is not null;
+    }
+
+    private static FeatureEvaluation? GetDependencyFailure(FeatureDefinition definition, FeatureDependency dependency, FeatureEvaluation? evaluation)
+    {
+        if (evaluation is null || evaluation.ReasonKind == FeatureEvaluationReasonKind.DependencyCycle)
         {
-            var evaluation = EvaluateCore(dependency.Key, context, evaluationStack);
-            var statusMatches = evaluation.Exists && evaluation.Status == dependency.RequiredStatus;
-            var variantMatches = dependency.RequiredVariant is null || string.Equals(evaluation.Variant, dependency.RequiredVariant, StringComparison.Ordinal);
-
-            if (string.Equals(evaluation.Reason, FeatureEvaluationReasons.DependencyCycle, StringComparison.Ordinal))
-            {
-                return FeatureEvaluationFactory.DependencyCycle(definition);
-            }
-
-            if (!statusMatches || !variantMatches)
-            {
-                return FeatureEvaluationFactory.DependencyBlocked(definition);
-            }
+            return FeatureEvaluationFactory.DependencyCycle(definition);
         }
 
-        return null;
+        var statusMatches = evaluation.Exists && evaluation.Status == dependency.RequiredStatus;
+        var variantMatches = dependency.RequiredVariant is null || string.Equals(evaluation.Variant, dependency.RequiredVariant, StringComparison.Ordinal);
+        return statusMatches && variantMatches ? null : FeatureEvaluationFactory.DependencyBlocked(definition);
     }
 
     private (FeatureTargetingRule? Rule, int Index) FindRule(FeatureDefinition definition, FeatureEvaluationContext context)
@@ -98,7 +143,7 @@ internal sealed class FeatureEvaluationEngine
         {
             var rule = definition.Rules[index];
 
-            if (rule.Matches(definition.Key, context, _segmentMatcher.Matches))
+            if (rule.Matches(definition.Key, context, _matchSegment))
             {
                 return (rule, index);
             }
@@ -114,8 +159,18 @@ internal sealed class FeatureEvaluationEngine
             return null;
         }
 
-        return definition.Targets.FirstOrDefault(target =>
-            string.Equals(target.Key, context.TargetingKey, StringComparison.Ordinal) &&
-            (target.ContextKind is null || string.Equals(target.ContextKind, context.ContextKind, StringComparison.OrdinalIgnoreCase)));
+        for (var index = 0; index < definition.Targets.Count; index++)
+        {
+            var target = definition.Targets[index];
+            if (string.Equals(target.Key, context.TargetingKey, StringComparison.Ordinal)
+                && (target.ContextKind is null || string.Equals(target.ContextKind, context.ContextKind, StringComparison.OrdinalIgnoreCase)))
+            {
+                return target;
+            }
+        }
+
+        return null;
     }
+
+    private readonly record struct DependencyFrame(FeatureDefinition Definition, int Index);
 }

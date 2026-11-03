@@ -27,12 +27,18 @@ This feature slice adds SDK-side capabilities that are useful inside .NET applic
 
 1. Missing key returns a missing evaluation.
 2. Targeting-off flags return the off variation/value.
-3. Dependencies are evaluated recursively with cycle protection.
+3. Dependencies are evaluated iteratively with cycle protection.
 4. Individual targets are checked by context key and optional context kind.
 5. Rules are evaluated in order, including segment include/exclude requirements.
 6. Fallthrough variation is used when configured.
 7. Weighted variants are selected deterministically by feature key and targeting key.
 8. Default status/value is returned.
+
+Nested segment rules resolve membership iteratively. A rule matches only when its inclusions and exclusions can be decided. Direct segment exclusions take precedence over direct inclusions and rules.
+
+Minimum-version conditions compare numeric components and ignore prerelease and build suffixes. Malformed numeric components cause the condition to fail. Weighted assignment uses positive finite weights and reports the index of the selected entry.
+
+An unresolved variation name uses the selecting clause's status. Off clauses use disabled status in that case.
 
 ## Deferred Platform Capabilities
 

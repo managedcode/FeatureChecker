@@ -8,6 +8,8 @@ namespace ManagedCode.FeatureChecker.Targeting;
 internal static class FeatureRollout
 {
     private const double MaximumPercentage = 100d;
+    private const int StackBufferLimit = 256;
+    private const byte RolloutSeparator = (byte)':';
 
     public static bool IsIncluded(string featureKey, string targetingKey, double percentage)
     {
@@ -24,50 +26,86 @@ internal static class FeatureRollout
         return GetBucket(featureKey, targetingKey) < percentage;
     }
 
-    public static FeatureVariant? SelectVariant(string featureKey, string targetingKey, IReadOnlyList<FeatureVariant> variants)
+    public static int? SelectVariantIndex(string featureKey, string targetingKey, IReadOnlyList<FeatureVariant> variants)
     {
         if (variants.Count == 0)
         {
             return null;
         }
 
-        var weightedVariants = variants
-            .Where(variant => variant.Weight > 0d)
-            .ToArray();
-
-        if (weightedVariants.Length == 0)
+        var totalWeight = 0d;
+        var largestWeight = 0d;
+        for (var index = 0; index < variants.Count; index++)
         {
-            return variants[0];
+            var weight = GetWeight(variants[index]);
+            totalWeight += weight;
+            largestWeight = Math.Max(largestWeight, weight);
         }
 
-        var totalWeight = weightedVariants.Sum(variant => variant.Weight);
-        var bucket = GetBucket(featureKey, targetingKey) / MaximumPercentage * totalWeight;
-        var cursor = 0d;
-
-        foreach (var variant in weightedVariants)
+        if (totalWeight == 0d)
         {
-            cursor += variant.Weight;
+            return 0;
+        }
 
-            if (bucket < cursor)
+        var scale = 1d;
+        if (double.IsPositiveInfinity(totalWeight))
+        {
+            scale = largestWeight;
+            totalWeight = 0d;
+            for (var index = 0; index < variants.Count; index++)
             {
-                return variant;
+                totalWeight += GetWeight(variants[index]) / scale;
             }
         }
 
-        return weightedVariants[^1];
+        var bucket = GetBucket(featureKey, targetingKey) / MaximumPercentage * totalWeight;
+        return SelectByBucket(variants, bucket, scale);
+    }
+
+    private static int SelectByBucket(IReadOnlyList<FeatureVariant> variants, double bucket, double scale)
+    {
+        var cursor = 0d;
+        var lastWeightedIndex = 0;
+
+        for (var index = 0; index < variants.Count; index++)
+        {
+            var weight = GetWeight(variants[index]);
+            if (weight == 0d)
+            {
+                continue;
+            }
+
+            lastWeightedIndex = index;
+            cursor += weight / scale;
+            if (bucket < cursor)
+            {
+                return index;
+            }
+        }
+
+        return lastWeightedIndex;
+    }
+
+    private static double GetWeight(FeatureVariant variant)
+    {
+        return double.IsFinite(variant.Weight) && variant.Weight > 0d ? variant.Weight : 0d;
     }
 
     private static double GetBucket(string featureKey, string targetingKey)
     {
-        var key = string.Concat(featureKey, Constants.RolloutSeparator, targetingKey);
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(key));
+        var encoding = Encoding.UTF8;
+        var featureByteCount = encoding.GetByteCount(featureKey);
+        var length = checked(featureByteCount + 1 + encoding.GetByteCount(targetingKey));
+        Span<byte> input = length <= StackBufferLimit ? stackalloc byte[length] : new byte[length];
+        encoding.GetBytes(featureKey, input[..featureByteCount]);
+        input[featureByteCount] = RolloutSeparator;
+        encoding.GetBytes(targetingKey, input[(featureByteCount + 1)..]);
+
+        Span<byte> hash = stackalloc byte[SHA256.HashSizeInBytes];
+        SHA256.HashData(input, hash);
         var value = BinaryPrimitives.ReadUInt64BigEndian(hash);
 
         return value / (double)ulong.MaxValue * MaximumPercentage;
     }
 
-    private static class Constants
-    {
-        public const string RolloutSeparator = ":";
-    }
 }

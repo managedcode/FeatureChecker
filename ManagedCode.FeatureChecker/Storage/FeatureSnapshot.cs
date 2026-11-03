@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using ManagedCode.FeatureChecker.Definitions;
 using ManagedCode.FeatureChecker.Segments;
 
@@ -7,9 +8,9 @@ public sealed record FeatureSnapshot
 {
     public int SchemaVersion { get; init; } = 1;
 
-    public IReadOnlyList<FeatureDefinition> Features { get; init; } = [];
+    public IReadOnlyList<FeatureDefinition> Features { get; init => field = FeatureCollections.Freeze(value); } = [];
 
-    public IReadOnlyList<FeatureSegment> Segments { get; init; } = [];
+    public IReadOnlyList<FeatureSegment> Segments { get; init => field = FeatureCollections.Freeze(value); } = [];
 
     public static FeatureSnapshot FromDefinitions(IEnumerable<FeatureDefinition> features)
     {
@@ -17,7 +18,7 @@ public sealed record FeatureSnapshot
 
         return new FeatureSnapshot
         {
-            Features = features.ToList()
+            Features = features.ToImmutableArray()
         };
     }
 }

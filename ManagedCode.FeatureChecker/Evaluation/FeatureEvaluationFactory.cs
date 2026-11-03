@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using ManagedCode.FeatureChecker.Definitions;
 using ManagedCode.FeatureChecker.Targeting;
 
@@ -5,14 +6,16 @@ namespace ManagedCode.FeatureChecker.Evaluation;
 
 internal static class FeatureEvaluationFactory
 {
+    private static readonly ConditionalWeakTable<FeatureDefinition, FeatureEvaluation> ConstantResults = new();
+
+    public static FeatureEvaluation Constant(FeatureDefinition definition)
+    {
+        return ConstantResults.GetValue(definition, static item => item.TargetingEnabled ? Fallthrough(item, FeatureEvaluationContext.Empty) : Off(item));
+    }
+
     public static FeatureEvaluation Missing(string key)
     {
         return Create(key, false, FeatureStatus.Disabled, null, null, FeatureEvaluationReasons.Missing, FeatureEvaluationReasonKind.Missing);
-    }
-
-    public static FeatureEvaluation DependencyCycle(string key)
-    {
-        return Create(key, true, FeatureStatus.Disabled, null, null, FeatureEvaluationReasons.DependencyCycle, FeatureEvaluationReasonKind.DependencyCycle);
     }
 
     public static FeatureEvaluation DependencyCycle(FeatureDefinition definition)
@@ -25,18 +28,18 @@ internal static class FeatureEvaluationFactory
         return Create(definition.Key, true, FeatureStatus.Disabled, null, definition.Value, FeatureEvaluationReasons.Dependency, FeatureEvaluationReasonKind.Dependency);
     }
 
-    public static FeatureEvaluation Off(FeatureDefinition definition)
+    private static FeatureEvaluation Off(FeatureDefinition definition)
     {
         return string.IsNullOrWhiteSpace(definition.OffVariant)
             ? Create(definition.Key, true, FeatureStatus.Disabled, null, definition.OffValue ?? definition.Value, FeatureEvaluationReasons.Off, FeatureEvaluationReasonKind.Off)
-            : Variation(definition, definition.OffVariant, definition.OffValue, FeatureEvaluationReasons.Off, FeatureEvaluationReasonKind.Off);
+            : Variation(definition, definition.OffVariant, definition.OffValue, FeatureStatus.Disabled, FeatureEvaluationReasons.Off, FeatureEvaluationReasonKind.Off);
     }
 
     public static FeatureEvaluation Target(FeatureDefinition definition, FeatureTarget target)
     {
         return string.IsNullOrWhiteSpace(target.Variant)
             ? Create(definition.Key, true, target.Status, null, target.Value ?? definition.Value, FeatureEvaluationReasons.Target, FeatureEvaluationReasonKind.TargetMatch)
-            : Variation(definition, target.Variant, target.Value, FeatureEvaluationReasons.Target, FeatureEvaluationReasonKind.TargetMatch);
+            : Variation(definition, target.Variant, target.Value, target.Status, FeatureEvaluationReasons.Target, FeatureEvaluationReasonKind.TargetMatch);
     }
 
     public static FeatureEvaluation Rule(FeatureDefinition definition, FeatureTargetingRule rule, int ruleIndex)
@@ -49,52 +52,51 @@ internal static class FeatureEvaluationFactory
 
         return string.IsNullOrWhiteSpace(rule.Variant)
             ? Create(definition.Key, true, rule.Status, null, rule.Value ?? definition.Value, FeatureEvaluationReasons.Rule, FeatureEvaluationReasonKind.RuleMatch, null, ruleMatch)
-            : Variation(definition, rule.Variant, rule.Value, FeatureEvaluationReasons.Rule, FeatureEvaluationReasonKind.RuleMatch, ruleMatch);
+            : Variation(definition, rule.Variant, rule.Value, rule.Status, FeatureEvaluationReasons.Rule, FeatureEvaluationReasonKind.RuleMatch, ruleMatch);
     }
 
     public static FeatureEvaluation Fallthrough(FeatureDefinition definition, FeatureEvaluationContext context)
     {
         if (!string.IsNullOrWhiteSpace(definition.FallthroughVariant))
         {
-            return Variation(definition, definition.FallthroughVariant, definition.FallthroughValue, FeatureEvaluationReasons.Fallthrough, FeatureEvaluationReasonKind.Fallthrough);
+            return Variation(definition, definition.FallthroughVariant, definition.FallthroughValue, definition.Status, FeatureEvaluationReasons.Fallthrough, FeatureEvaluationReasonKind.Fallthrough);
         }
 
         if (!string.IsNullOrWhiteSpace(context.TargetingKey))
         {
-            var variantMatch = SelectVariant(definition, context.TargetingKey);
-            if (variantMatch.Variant is not null)
+            var variantIndex = FeatureRollout.SelectVariantIndex(definition.Key, context.TargetingKey, definition.Variants);
+            if (variantIndex is { } index)
             {
+                var variant = definition.Variants[index];
                 return Create(
                     definition.Key,
                     true,
-                    variantMatch.Variant.Status,
-                    variantMatch.Variant.Name,
-                    variantMatch.Variant.Value,
+                    variant.Status,
+                    variant.Name,
+                    variant.Value,
                     FeatureEvaluationReasons.Variant,
                     FeatureEvaluationReasonKind.Variant,
-                    variantMatch.Index);
+                    index);
             }
         }
 
         return Create(definition.Key, true, definition.Status, null, definition.Value, FeatureEvaluationReasons.Default, FeatureEvaluationReasonKind.Default);
     }
 
-    private static FeatureEvaluation Variation(FeatureDefinition definition, string variantName, string? value, string reason, FeatureEvaluationReasonKind reasonKind, FeatureRuleMatch? rule = null)
+    private static FeatureEvaluation Variation(
+        FeatureDefinition definition,
+        string variantName,
+        string? value,
+        FeatureStatus clauseStatus,
+        string reason,
+        FeatureEvaluationReasonKind reasonKind,
+        FeatureRuleMatch? rule = null)
     {
         var variantMatch = FindVariant(definition, variantName);
 
         return variantMatch.Variant is null
-            ? Create(definition.Key, true, definition.Status, variantName, value ?? definition.Value, reason, reasonKind, null, rule)
+            ? Create(definition.Key, true, clauseStatus, variantName, value ?? definition.Value, reason, reasonKind, null, rule)
             : Create(definition.Key, true, variantMatch.Variant.Status, variantMatch.Variant.Name, value ?? variantMatch.Variant.Value, reason, reasonKind, variantMatch.Index, rule);
-    }
-
-    private static (FeatureVariant? Variant, int? Index) SelectVariant(FeatureDefinition definition, string targetingKey)
-    {
-        var variant = FeatureRollout.SelectVariant(definition.Key, targetingKey, definition.Variants);
-
-        return variant is null
-            ? (null, null)
-            : (variant, FindVariantIndex(definition.Variants, variant.Name));
     }
 
     private static (FeatureVariant? Variant, int? Index) FindVariant(FeatureDefinition definition, string variantName)

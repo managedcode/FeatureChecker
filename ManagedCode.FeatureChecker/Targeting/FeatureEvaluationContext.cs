@@ -1,18 +1,22 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 
 namespace ManagedCode.FeatureChecker.Targeting;
 
 public sealed class FeatureEvaluationContext
 {
-    private static readonly IReadOnlyDictionary<string, string> EmptyAttributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    private static readonly IReadOnlyDictionary<string, string> EmptyAttributes = ReadOnlyDictionary<string, string>.Empty;
 
     public FeatureEvaluationContext(string? targetingKey = null, IReadOnlyDictionary<string, string>? attributes = null, string contextKind = FeatureContextKinds.User)
+        : this(targetingKey, contextKind, CopyAttributes(attributes))
+    {
+    }
+
+    private FeatureEvaluationContext(string? targetingKey, string contextKind, IReadOnlyDictionary<string, string> attributes)
     {
         TargetingKey = targetingKey;
         ContextKind = string.IsNullOrWhiteSpace(contextKind) ? FeatureContextKinds.User : contextKind;
-        Attributes = attributes is null
-            ? EmptyAttributes
-            : new Dictionary<string, string>(attributes, StringComparer.OrdinalIgnoreCase);
+        Attributes = attributes;
     }
 
     public static FeatureEvaluationContext Empty { get; } = new();
@@ -39,21 +43,21 @@ public sealed class FeatureEvaluationContext
             [name] = ConvertAttributeValue(value)
         };
 
-        return new FeatureEvaluationContext(TargetingKey, attributes, ContextKind);
+        return new FeatureEvaluationContext(TargetingKey, ContextKind, new ReadOnlyDictionary<string, string>(attributes));
     }
 
     public FeatureEvaluationContext WithTargetingKey(string targetingKey)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetingKey);
 
-        return new FeatureEvaluationContext(targetingKey, Attributes, ContextKind);
+        return new FeatureEvaluationContext(targetingKey, ContextKind, Attributes);
     }
 
     public FeatureEvaluationContext WithContextKind(string contextKind)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(contextKind);
 
-        return new FeatureEvaluationContext(TargetingKey, Attributes, contextKind);
+        return new FeatureEvaluationContext(TargetingKey, contextKind, Attributes);
     }
 
     public bool TryGetAttribute(string name, out string value)
@@ -63,13 +67,20 @@ public sealed class FeatureEvaluationContext
         return Attributes.TryGetValue(name, out value!);
     }
 
-    private static string ConvertAttributeValue(object? value)
+    private static IReadOnlyDictionary<string, string> CopyAttributes(IReadOnlyDictionary<string, string>? attributes)
+    {
+        return attributes is null or { Count: 0 }
+            ? EmptyAttributes
+            : new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(attributes, StringComparer.OrdinalIgnoreCase));
+    }
+
+    internal static string ConvertAttributeValue(object? value)
     {
         return value switch
         {
             null => string.Empty,
             string text => text,
-            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty,
             _ => value.ToString() ?? string.Empty
         };
     }

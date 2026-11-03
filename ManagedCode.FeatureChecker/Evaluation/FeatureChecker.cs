@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using ManagedCode.FeatureChecker.Definitions;
 using ManagedCode.FeatureChecker.Segments;
 using ManagedCode.FeatureChecker.Storage;
@@ -7,34 +8,18 @@ namespace ManagedCode.FeatureChecker.Evaluation;
 
 public class FeatureChecker : IFeatureEvaluator
 {
-    private readonly IReadOnlyDictionary<string, FeatureDefinition> _features;
+    private static readonly ConditionalWeakTable<FeatureSnapshot, SnapshotIndex> SnapshotIndexes = new();
+    private readonly Dictionary<string, FeatureDefinition> _features;
     private readonly FeatureEvaluationEngine _engine;
 
     public FeatureChecker(FeatureSnapshot snapshot)
-        : this(new FeatureSnapshotProvider(snapshot))
+        : this(GetSnapshotIndex(snapshot))
     {
     }
 
     public FeatureChecker(IFeatureDefinitionProvider provider)
+        : this(CreateIndex(provider))
     {
-        ArgumentNullException.ThrowIfNull(provider);
-
-        if (provider is IFeatureSnapshotSource snapshotSource)
-        {
-            var snapshot = snapshotSource.GetSnapshot();
-            var snapshotMaps = CreateMaps(snapshot.Features, snapshot.Segments);
-
-            _features = snapshotMaps.Features;
-            _engine = new FeatureEvaluationEngine(snapshotMaps.Features, snapshotMaps.Segments);
-
-            return;
-        }
-
-        var maps = CreateMaps(
-            provider.GetFeatureDefinitions(),
-            provider is IFeatureSegmentProvider segmentProvider ? segmentProvider.GetFeatureSegments() : []);
-        _features = maps.Features;
-        _engine = new FeatureEvaluationEngine(maps.Features, maps.Segments);
     }
 
     public FeatureChecker(IEnumerable<FeatureDefinition> features)
@@ -43,13 +28,33 @@ public class FeatureChecker : IFeatureEvaluator
     }
 
     public FeatureChecker(IEnumerable<FeatureDefinition> features, IEnumerable<FeatureSegment> segments)
+        : this(CreateIndex(features, segments))
     {
-        var maps = CreateMaps(features, segments);
-        _features = maps.Features;
-        _engine = new FeatureEvaluationEngine(maps.Features, maps.Segments);
     }
 
-    private static (IReadOnlyDictionary<string, FeatureDefinition> Features, IReadOnlyDictionary<string, FeatureSegment> Segments) CreateMaps(
+    private FeatureChecker(SnapshotIndex index)
+    {
+        _features = index.Features;
+        _engine = index.Engine;
+    }
+
+    private static SnapshotIndex GetSnapshotIndex(FeatureSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        return SnapshotIndexes.GetValue(snapshot, static item => CreateIndex(item.Features, item.Segments));
+    }
+
+    private static SnapshotIndex CreateIndex(IFeatureDefinitionProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+
+        return provider is IFeatureSnapshotSource snapshotSource
+            ? GetSnapshotIndex(snapshotSource.GetSnapshot())
+            : CreateIndex(provider.GetFeatureDefinitions(), provider is IFeatureSegmentProvider segmentProvider ? segmentProvider.GetFeatureSegments() : []);
+    }
+
+    private static SnapshotIndex CreateIndex(
         IEnumerable<FeatureDefinition> features,
         IEnumerable<FeatureSegment> segments)
     {
@@ -65,7 +70,7 @@ public class FeatureChecker : IFeatureEvaluator
             segment => segment,
             StringComparer.Ordinal);
 
-        return (featureMap, segmentMap);
+        return new SnapshotIndex(featureMap, new FeatureEvaluationEngine(featureMap, segmentMap));
     }
 
     public int Count => _features.Count;
@@ -100,10 +105,18 @@ public class FeatureChecker : IFeatureEvaluator
 
     public IReadOnlyList<string> GetFeatureKeysByStatus(FeatureStatus status, FeatureEvaluationContext? context = null)
     {
-        return EvaluateAll(context)
-            .Where(feature => feature.Value.Status == status)
-            .Select(feature => feature.Key)
-            .ToList();
+        var evaluationContext = context ?? FeatureEvaluationContext.Empty;
+        var keys = new List<string>();
+        Dictionary<string, FeatureEvaluation?>? dependencyResults = null;
+        foreach (var (key, definition) in _features)
+        {
+            if (_engine.Evaluate(definition, evaluationContext, ref dependencyResults).Status == status)
+            {
+                keys.Add(key);
+            }
+        }
+
+        return keys;
     }
 
     public FeatureEvaluation Evaluate(string featureKey, FeatureEvaluationContext? context = null)
@@ -118,10 +131,14 @@ public class FeatureChecker : IFeatureEvaluator
     {
         var evaluationContext = context ?? FeatureEvaluationContext.Empty;
 
-        return _features.Keys.ToDictionary(
-            key => key,
-            key => _engine.Evaluate(key, evaluationContext),
-            StringComparer.Ordinal);
+        var evaluations = new Dictionary<string, FeatureEvaluation>(_features.Count, StringComparer.Ordinal);
+        Dictionary<string, FeatureEvaluation?>? dependencyResults = null;
+        foreach (var (key, definition) in _features)
+        {
+            evaluations.Add(key, _engine.Evaluate(definition, evaluationContext, ref dependencyResults));
+        }
+
+        return evaluations;
     }
 
     private static string RequireKey(string key)
@@ -131,4 +148,5 @@ public class FeatureChecker : IFeatureEvaluator
         return key;
     }
 
+    private sealed record SnapshotIndex(Dictionary<string, FeatureDefinition> Features, FeatureEvaluationEngine Engine);
 }

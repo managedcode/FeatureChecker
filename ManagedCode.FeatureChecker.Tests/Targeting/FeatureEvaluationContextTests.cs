@@ -3,6 +3,25 @@ namespace ManagedCode.FeatureChecker.Tests.Targeting;
 public sealed class FeatureEvaluationContextTests
 {
     [Test]
+    public void FeatureEvaluationContext_ShouldKeepAttributesImmutableAcrossDerivedContexts()
+    {
+        var input = new Dictionary<string, string>(StringComparer.Ordinal) { [AttributeNames.Count] = "42" };
+        var original = new FeatureEvaluationContext(TargetingKeys.UserA, input);
+        var derived = original.WithTargetingKey(TargetingKeys.TenantA).WithContextKind(FeatureContextKinds.Tenant);
+        input[AttributeNames.Count] = "43";
+
+        if (derived.Attributes is IDictionary<string, string> { IsReadOnly: false } writable)
+        {
+            writable[AttributeNames.Count] = "44";
+        }
+
+        original.Attributes["COUNT"].ShouldBe("42");
+        derived.Attributes["COUNT"].ShouldBe("42");
+        derived.With("COUNT", 45).Attributes[AttributeNames.Count].ShouldBe("45");
+        derived.Attributes[AttributeNames.Count].ShouldBe("42");
+    }
+
+    [Test]
     public void FeatureEvaluationContext_ShouldConvertAttributeValues()
     {
         var context = FeatureEvaluationContext.ForTargetingKey(TargetingKeys.UserA)

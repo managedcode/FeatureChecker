@@ -130,6 +130,7 @@ flowchart TD
 ## Key Decisions
 
 - The core package owns deterministic local evaluation and JSON snapshots.
+- Feature definitions, contexts, and snapshots own their collections. Evaluation shares indexes by snapshot identity and keeps traversal state local to each evaluation or batch.
 - Vendor, cloud, edge, and ManagedCode.Storage integrations should be separate adapter packages unless a later ADR changes the package boundary.
 - Backend-managed feature configuration uses `IFeatureSnapshotSource` and adapter packages or application code to load complete snapshots from tables, APIs, object storage, or config services.
 - GitHub's default CodeQL setup is the code-scanning owner; the checked-in advanced CodeQL workflow was removed to avoid duplicate setup failures.

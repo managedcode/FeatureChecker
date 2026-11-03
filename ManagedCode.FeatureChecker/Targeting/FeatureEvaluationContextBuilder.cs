@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace ManagedCode.FeatureChecker.Targeting;
 
 public sealed class FeatureEvaluationContextBuilder
@@ -129,7 +127,7 @@ public sealed class FeatureEvaluationContextBuilder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        _attributes[name] = ConvertAttributeValue(value);
+        _attributes[name] = FeatureEvaluationContext.ConvertAttributeValue(value);
 
         return this;
     }
@@ -139,14 +137,4 @@ public sealed class FeatureEvaluationContextBuilder
         return new FeatureEvaluationContext(_targetingKey, _attributes, _contextKind);
     }
 
-    private static string ConvertAttributeValue(object? value)
-    {
-        return value switch
-        {
-            null => string.Empty,
-            string text => text,
-            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-            _ => value.ToString() ?? string.Empty
-        };
-    }
 }

@@ -8,11 +8,11 @@ public sealed record FeatureSegment
 
     public string? Description { get; init; }
 
-    public IReadOnlyList<string> IncludedKeys { get; init; } = [];
+    public IReadOnlyList<string> IncludedKeys { get; init => field = FeatureCollections.Freeze(value); } = [];
 
-    public IReadOnlyList<string> ExcludedKeys { get; init; } = [];
+    public IReadOnlyList<string> ExcludedKeys { get; init => field = FeatureCollections.Freeze(value); } = [];
 
-    public IReadOnlyList<FeatureTargetingRule> Rules { get; init; } = [];
+    public IReadOnlyList<FeatureTargetingRule> Rules { get; init => field = FeatureCollections.Freeze(value); } = [];
 
-    public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyDictionary<string, string> Metadata { get; init => field = FeatureCollections.FreezeMetadata(value); } = FeatureCollections.EmptyMetadata;
 }

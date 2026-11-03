@@ -3,6 +3,22 @@ namespace ManagedCode.FeatureChecker.Tests.Targeting;
 public sealed class FeatureConditionOperatorTests
 {
     [Test]
+    [Arguments("invalid", "0.0", false)]
+    [Arguments("2.0", "invalid", false)]
+    [Arguments("3.bad", "2.0", false)]
+    [Arguments("2..0", "2.0", false)]
+    [Arguments("2.1-rc.1+build", "2.1.0", true)]
+    [Arguments("2.0.1", "2.1", false)]
+    [Arguments("2.1.0.1", "2.1", true)]
+    public void VersionCondition_RequiresValidNumericComponents(string actual, string minimum, bool matches)
+    {
+        var checker = CreateChecker((FeatureNames.InvalidVersion, FeatureCondition.VersionAtLeast(AttributeNames.Version, minimum)));
+        var context = FeatureEvaluationContext.ForTargetingKey(TargetingKeys.UserA).With(AttributeNames.Version, actual);
+
+        checker.IsEnabled(FeatureNames.InvalidVersion, context).ShouldBe(matches);
+    }
+
+    [Test]
     public void FeatureChecker_ShouldRejectMissingAttributesForPositiveConditionOperators()
     {
         var checker = CreateChecker(

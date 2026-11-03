@@ -70,10 +70,10 @@ public sealed class FeatureSegmentBuilder
         {
             Key = _key,
             Description = _description,
-            IncludedKeys = [.. _includedKeys],
-            ExcludedKeys = [.. _excludedKeys],
-            Rules = [.. _rules],
-            Metadata = new Dictionary<string, string>(_metadata, StringComparer.OrdinalIgnoreCase)
+            IncludedKeys = _includedKeys,
+            ExcludedKeys = _excludedKeys,
+            Rules = _rules,
+            Metadata = _metadata
         };
     }
 

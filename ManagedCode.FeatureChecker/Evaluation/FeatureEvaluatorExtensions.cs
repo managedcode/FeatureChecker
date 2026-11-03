@@ -51,47 +51,54 @@ public static class FeatureEvaluatorExtensions
 
         var value = evaluator.Evaluate(featureKey, context).Value;
 
-        return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var result) ? result : defaultValue;
+        return GetFiniteDouble(value, defaultValue);
     }
 
     public static FeatureVariationDetail<string> StringVariationDetail(this IFeatureEvaluator evaluator, string featureKey, string defaultValue, FeatureEvaluationContext? context = null)
     {
         ArgumentNullException.ThrowIfNull(evaluator);
 
-        return CreateDetail(evaluator.Evaluate(featureKey, context), evaluation => evaluation.Value ?? defaultValue);
+        var evaluation = evaluator.Evaluate(featureKey, context);
+        return CreateDetail(evaluation, evaluation.Value ?? defaultValue);
     }
 
     public static FeatureVariationDetail<bool> BoolVariationDetail(this IFeatureEvaluator evaluator, string featureKey, bool defaultValue, FeatureEvaluationContext? context = null)
     {
         ArgumentNullException.ThrowIfNull(evaluator);
 
-        return CreateDetail(evaluator.Evaluate(featureKey, context), evaluation => bool.TryParse(evaluation.Value, out var result) ? result : defaultValue);
+        var evaluation = evaluator.Evaluate(featureKey, context);
+        return CreateDetail(evaluation, bool.TryParse(evaluation.Value, out var result) ? result : defaultValue);
     }
 
     public static FeatureVariationDetail<int> IntVariationDetail(this IFeatureEvaluator evaluator, string featureKey, int defaultValue, FeatureEvaluationContext? context = null)
     {
         ArgumentNullException.ThrowIfNull(evaluator);
 
-        return CreateDetail(
-            evaluator.Evaluate(featureKey, context),
-            evaluation => int.TryParse(evaluation.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result) ? result : defaultValue);
+        var evaluation = evaluator.Evaluate(featureKey, context);
+        return CreateDetail(evaluation, int.TryParse(evaluation.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result) ? result : defaultValue);
     }
 
     public static FeatureVariationDetail<double> DoubleVariationDetail(this IFeatureEvaluator evaluator, string featureKey, double defaultValue, FeatureEvaluationContext? context = null)
     {
         ArgumentNullException.ThrowIfNull(evaluator);
 
-        return CreateDetail(
-            evaluator.Evaluate(featureKey, context),
-            evaluation => double.TryParse(evaluation.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var result) ? result : defaultValue);
+        var evaluation = evaluator.Evaluate(featureKey, context);
+        return CreateDetail(evaluation, GetFiniteDouble(evaluation.Value, defaultValue));
     }
 
-    private static FeatureVariationDetail<T> CreateDetail<T>(FeatureEvaluation evaluation, Func<FeatureEvaluation, T> resolveValue)
+    private static double GetFiniteDouble(string? value, double defaultValue)
+    {
+        return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var result) && double.IsFinite(result)
+            ? result
+            : defaultValue;
+    }
+
+    private static FeatureVariationDetail<T> CreateDetail<T>(FeatureEvaluation evaluation, T value)
     {
         return new FeatureVariationDetail<T>
         {
             Key = evaluation.Key,
-            Value = resolveValue(evaluation),
+            Value = value,
             VariationIndex = evaluation.VariationIndex,
             ReasonKind = evaluation.ReasonKind,
             Reason = evaluation.Reason,

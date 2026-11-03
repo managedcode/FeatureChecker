@@ -32,7 +32,7 @@ flowchart TD
 ## Ordering
 
 1. Missing keys evaluate as disabled with reason `Missing`.
-2. Dependency checks run before targeting rules.
+2. Dependency checks run before targeting rules. Evaluation walks dependencies iteratively and reuses resolved results within one evaluation or batch.
 3. Rules are evaluated in declaration order.
 4. Rule conditions must all match.
 5. Percentage rules require a non-empty targeting key and use deterministic hashing of feature key plus targeting key.
@@ -46,7 +46,7 @@ flowchart TD
 - `TargetingKey` for sticky rollout and variants.
 - Case-insensitive string attributes for targeting rules.
 
-Attribute values are converted using invariant culture for stable serialization and comparisons.
+Attribute values are converted using invariant culture for stable serialization and comparisons. Contexts own their attributes. Changing the targeting key or context kind can reuse the same immutable attributes.
 
 ## Storage Boundary
 
@@ -60,3 +60,7 @@ The core package serializes `FeatureSnapshot` to JSON strings, streams, and file
 Adapters should fetch and persist snapshots, then pass definitions into `FeatureChecker` through `FeatureSnapshot`, `FeatureFileProvider`, `IFeatureSnapshotSource`, or `IFeatureDefinitionProvider`.
 
 Use `IFeatureSnapshotSource` when a backend can provide a complete snapshot. It keeps features and segments from the same source version and lets application code refresh by creating fresh evaluators or scopes through `IFeatureCheckerFactory`.
+
+Snapshots own their feature and segment collections. Evaluators for the same snapshot share its lookup index. A fresh evaluator captures the latest snapshot from its provider.
+
+`FeatureFileProvider` compares file contents and reuses the parsed snapshot for unchanged files up to 1 MiB. `FeatureSnapshotSerializer.Save` stages output alongside the destination and replaces the file after serialization succeeds. A JSON `null` document is invalid.

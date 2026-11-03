@@ -8,7 +8,7 @@ public sealed record FeatureCondition
 
     public FeatureConditionOperator Operator { get; init; } = FeatureConditionOperator.Equals;
 
-    public IReadOnlyList<string> Values { get; init; } = [];
+    public IReadOnlyList<string> Values { get; init => field = FeatureCollections.Freeze(value); } = [];
 
     public static FeatureCondition Equals(string attribute, string value)
     {
@@ -93,10 +93,8 @@ public sealed record FeatureCondition
     {
         return Operator switch
         {
-            FeatureConditionOperator.Equals => ValuesContainMatch(actualValue, MatchesValue),
-            FeatureConditionOperator.In => ValuesContainMatch(actualValue, MatchesValue),
-            FeatureConditionOperator.NotEquals => ValuesAllMatch(actualValue, static (actual, expected) => !MatchesValue(actual, expected)),
-            FeatureConditionOperator.NotIn => ValuesAllMatch(actualValue, static (actual, expected) => !MatchesValue(actual, expected)),
+            FeatureConditionOperator.Equals or FeatureConditionOperator.In => ValuesContainMatch(actualValue, MatchesValue),
+            FeatureConditionOperator.NotEquals or FeatureConditionOperator.NotIn => !ValuesContainMatch(actualValue, MatchesValue),
             _ => null
         };
     }
@@ -108,7 +106,7 @@ public sealed record FeatureCondition
             FeatureConditionOperator.Contains => ValuesContainMatch(actualValue, static (actual, expected) => actual.Contains(expected, StringComparison.OrdinalIgnoreCase)),
             FeatureConditionOperator.StartsWith => ValuesContainMatch(actualValue, static (actual, expected) => actual.StartsWith(expected, StringComparison.OrdinalIgnoreCase)),
             FeatureConditionOperator.EndsWith => ValuesContainMatch(actualValue, static (actual, expected) => actual.EndsWith(expected, StringComparison.OrdinalIgnoreCase)),
-            FeatureConditionOperator.VersionAtLeast => ValuesContainMatch(actualValue, static (actual, expected) => CompareVersion(actual, expected) >= 0),
+            FeatureConditionOperator.VersionAtLeast => ValuesContainMatch(actualValue, IsVersionAtLeast),
             _ => false
         };
     }
@@ -121,7 +119,7 @@ public sealed record FeatureCondition
         {
             Attribute = attribute,
             Operator = conditionOperator,
-            Values = values.ToList()
+            Values = values
         };
     }
 
@@ -130,51 +128,55 @@ public sealed record FeatureCondition
         return string.Equals(actualValue, expectedValue, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static int CompareVersion(string actualValue, string expectedValue)
+    private static bool IsVersionAtLeast(string actualValue, string expectedValue)
     {
-        var actualParts = ParseVersion(actualValue);
-        var expectedParts = ParseVersion(expectedValue);
-        var length = Math.Max(actualParts.Count, expectedParts.Count);
+        var actual = GetVersionCore(actualValue);
+        var expected = GetVersionCore(expectedValue);
+        var actualParts = actual.Split('.');
+        var expectedParts = expected.Split('.');
+        var comparison = 0;
 
-        for (var index = 0; index < length; index++)
+        while (true)
         {
-            var actual = index < actualParts.Count ? actualParts[index] : 0;
-            var expected = index < expectedParts.Count ? expectedParts[index] : 0;
-            var comparison = actual.CompareTo(expected);
-
-            if (comparison != 0)
+            var hasActual = actualParts.MoveNext();
+            var hasExpected = expectedParts.MoveNext();
+            if (!hasActual && !hasExpected)
             {
-                return comparison;
+                return comparison >= 0;
+            }
+
+            var actualNumber = 0;
+            var expectedNumber = 0;
+            if ((hasActual && !TryParseVersionPart(actual[actualParts.Current], out actualNumber))
+                || (hasExpected && !TryParseVersionPart(expected[expectedParts.Current], out expectedNumber)))
+            {
+                return false;
+            }
+
+            if (comparison == 0)
+            {
+                comparison = actualNumber.CompareTo(expectedNumber);
             }
         }
-
-        return 0;
     }
 
-    private static IReadOnlyList<int> ParseVersion(string value)
+    private static ReadOnlySpan<char> GetVersionCore(string value)
     {
-        var stableValue = value.Split(['-', '+'], 2, StringSplitOptions.TrimEntries)[0];
-        var parts = stableValue.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var result = new List<int>(parts.Length);
+        var span = value.AsSpan();
+        var suffixStart = span.IndexOfAny('-', '+');
+        return suffixStart < 0 ? span : span[..suffixStart];
+    }
 
-        foreach (var part in parts)
-        {
-            if (!int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
-            {
-                return [];
-            }
-
-            result.Add(number);
-        }
-
-        return result;
+    private static bool TryParseVersionPart(ReadOnlySpan<char> part, out int value)
+    {
+        return int.TryParse(part.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out value);
     }
 
     private bool ValuesContainMatch(string actualValue, Func<string, string, bool> predicate)
     {
-        foreach (var value in Values)
+        for (var index = 0; index < Values.Count; index++)
         {
-            if (predicate(actualValue, value))
+            if (predicate(actualValue, Values[index]))
             {
                 return true;
             }
@@ -183,16 +185,4 @@ public sealed record FeatureCondition
         return false;
     }
 
-    private bool ValuesAllMatch(string actualValue, Func<string, string, bool> predicate)
-    {
-        foreach (var value in Values)
-        {
-            if (!predicate(actualValue, value))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
 }

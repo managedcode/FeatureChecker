@@ -7,6 +7,7 @@ namespace ManagedCode.FeatureChecker.Storage;
 public sealed class OptionsFeatureDefinitionProvider : IFeatureDefinitionProvider, IFeatureSegmentProvider, IFeatureSnapshotSource
 {
     private readonly IOptionsMonitor<FeatureCheckerOptions> _options;
+    private FeatureFileProvider? _fileProvider;
 
     public OptionsFeatureDefinitionProvider(IOptionsMonitor<FeatureCheckerOptions> options)
     {
@@ -26,12 +27,19 @@ public sealed class OptionsFeatureDefinitionProvider : IFeatureDefinitionProvide
     public FeatureSnapshot GetSnapshot()
     {
         var options = _options.CurrentValue;
-
-        if (!string.IsNullOrWhiteSpace(options.FilePath) && File.Exists(options.FilePath))
+        var path = options.FilePath;
+        if (string.IsNullOrWhiteSpace(path))
         {
-            return FeatureSnapshotSerializer.Load(options.FilePath);
+            return options.Snapshot;
         }
 
-        return options.Snapshot;
+        var fileProvider = Volatile.Read(ref _fileProvider);
+        if (fileProvider is null || !string.Equals(fileProvider.FilePath, path, StringComparison.Ordinal))
+        {
+            fileProvider = new FeatureFileProvider(path);
+            Volatile.Write(ref _fileProvider, fileProvider);
+        }
+
+        return fileProvider.GetSnapshot();
     }
 }

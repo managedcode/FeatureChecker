@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using ManagedCode.FeatureChecker.Evaluation;
 using ManagedCode.FeatureChecker.Segments;
 using ManagedCode.FeatureChecker.Storage;
@@ -30,8 +31,8 @@ public sealed class FeatureSetBuilder : IFeatureSetBuilder
     {
         return new FeatureSnapshot
         {
-            Features = _features.ConvertAll(static feature => feature.Build()),
-            Segments = _segments.ConvertAll(static segment => segment.Build())
+            Features = _features.Select(static feature => feature.Build()).ToImmutableArray(),
+            Segments = _segments.Select(static segment => segment.Build()).ToImmutableArray()
         };
     }
 

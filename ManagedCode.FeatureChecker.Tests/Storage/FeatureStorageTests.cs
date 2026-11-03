@@ -5,6 +5,24 @@ namespace ManagedCode.FeatureChecker.Tests.Storage;
 public sealed class FeatureStorageTests
 {
     [Test]
+    public void Snapshot_CapturesItsListsAndKeepsEditedCopiesSeparate()
+    {
+        const string key = "reports";
+        var definitions = new List<FeatureDefinition> { FeatureDefinition.Create(key, FeatureStatus.Enabled) };
+        var segments = new List<FeatureSegment> { new() { Key = "beta" } };
+        var snapshot = new FeatureSnapshot { Features = definitions, Segments = segments };
+        var original = new FeatureCheckerEvaluator(snapshot);
+        definitions.Clear();
+        segments.Clear();
+        var edited = snapshot with { Features = [FeatureDefinition.Create(key, FeatureStatus.Disabled)] };
+
+        original.IsEnabled(key).ShouldBeTrue();
+        new FeatureCheckerEvaluator(snapshot).IsEnabled(key).ShouldBeTrue();
+        new FeatureCheckerEvaluator(edited).IsDisabled(key).ShouldBeTrue();
+        snapshot.Segments.Single().Key.ShouldBe("beta");
+    }
+
+    [Test]
     public void FeatureSnapshotSerializer_ShouldRoundTripJsonAndStreams()
     {
         var snapshot = new FeatureSnapshot
@@ -93,6 +111,34 @@ public sealed class FeatureStorageTests
             var context = FeatureEvaluationContextBuilder.Create().ForUser(TargetingKeys.UserA).Build();
 
             checker.IsEnabled(FeatureNames.MarketplaceConnect, context).ShouldBeTrue();
+        }
+        finally
+        {
+            DeleteFile(path);
+        }
+    }
+
+    [Test]
+    public void FeatureFileProvider_ObservesContentChangesWithTheSameLengthAndTimestamp()
+    {
+        const string key = "reports";
+        var path = CreateTempJsonPath();
+        try
+        {
+            FeatureSnapshotSerializer.Save(path, FeatureSnapshot.FromDefinitions([new FeatureDefinition { Key = key, Value = "old" }]));
+            var provider = new FeatureFileProvider(path);
+            var timestamp = File.GetLastWriteTimeUtc(path);
+            var length = new FileInfo(path).Length;
+            provider.GetSnapshot().Features.Single().Value.ShouldBe("old");
+
+            FeatureSnapshotSerializer.Save(path, FeatureSnapshot.FromDefinitions([new FeatureDefinition { Key = key, Value = "new" }]));
+            File.SetLastWriteTimeUtc(path, timestamp);
+
+            new FileInfo(path).Length.ShouldBe(length);
+            provider.GetSnapshot().Features.Single().Value.ShouldBe("new");
+
+            File.Delete(path);
+            Should.Throw<FileNotFoundException>(() => provider.GetSnapshot());
         }
         finally
         {

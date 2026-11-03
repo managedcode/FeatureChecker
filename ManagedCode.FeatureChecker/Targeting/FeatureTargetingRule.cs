@@ -1,4 +1,5 @@
 using ManagedCode.FeatureChecker.Definitions;
+using ManagedCode.FeatureChecker.Segments;
 
 namespace ManagedCode.FeatureChecker.Targeting;
 
@@ -14,28 +15,31 @@ public sealed record FeatureTargetingRule
 
     public double? Percentage { get; init; }
 
-    public IReadOnlyList<string> IncludeSegments { get; init; } = [];
+    public IReadOnlyList<string> IncludeSegments { get; init => field = FeatureCollections.Freeze(value); } = [];
 
-    public IReadOnlyList<string> ExcludeSegments { get; init; } = [];
+    public IReadOnlyList<string> ExcludeSegments { get; init => field = FeatureCollections.Freeze(value); } = [];
 
-    public IReadOnlyList<FeatureCondition> Conditions { get; init; } = [];
+    public IReadOnlyList<FeatureCondition> Conditions { get; init => field = FeatureCollections.Freeze(value); } = [];
 
-    internal bool Matches(string featureKey, FeatureEvaluationContext context, Func<string, FeatureEvaluationContext, bool>? segmentMatcher = null)
+    internal bool Matches(string featureKey, FeatureEvaluationContext context, Func<string, FeatureEvaluationContext, bool?> segmentMatcher)
     {
-        return MatchesSegments(context, segmentMatcher)
-            && AllConditionsMatch(context)
-            && MatchesPercentage(featureKey, context);
-    }
-
-    private bool MatchesSegments(FeatureEvaluationContext context, Func<string, FeatureEvaluationContext, bool>? segmentMatcher)
-    {
-        if (segmentMatcher is null)
+        if (!MatchesConditions(featureKey, context))
         {
-            return IncludeSegments.Count == 0 && ExcludeSegments.Count == 0;
+            return false;
         }
 
-        return !ContainsMatchingSegment(ExcludeSegments, context, segmentMatcher)
-            && (IncludeSegments.Count == 0 || ContainsMatchingSegment(IncludeSegments, context, segmentMatcher));
+        var segments = new SegmentRuleMatch(this);
+        while (segments.TryMoveNext(out var segmentKey))
+        {
+            segments.Accept(segmentMatcher(segmentKey, context));
+        }
+
+        return segments.Result is true;
+    }
+
+    internal bool MatchesConditions(string featureKey, FeatureEvaluationContext context)
+    {
+        return AllConditionsMatch(context) && MatchesPercentage(featureKey, context);
     }
 
     private bool MatchesPercentage(string featureKey, FeatureEvaluationContext context)
@@ -49,27 +53,11 @@ public sealed record FeatureTargetingRule
             && FeatureRollout.IsIncluded(featureKey, context.TargetingKey, percentage);
     }
 
-    private static bool ContainsMatchingSegment(
-        IReadOnlyList<string> segmentKeys,
-        FeatureEvaluationContext context,
-        Func<string, FeatureEvaluationContext, bool> segmentMatcher)
-    {
-        foreach (var segmentKey in segmentKeys)
-        {
-            if (segmentMatcher(segmentKey, context))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private bool AllConditionsMatch(FeatureEvaluationContext context)
     {
-        foreach (var condition in Conditions)
+        for (var index = 0; index < Conditions.Count; index++)
         {
-            if (!condition.Matches(context))
+            if (!Conditions[index].Matches(context))
             {
                 return false;
             }

@@ -247,7 +247,7 @@ FeatureVariationDetail<string> detail = checker.StringVariationDetail(
 Console.WriteLine($"{detail.Value} {detail.ReasonKind} {detail.VariationIndex}");
 ```
 
-Typed helpers are available for strings, booleans, integers, long integers, and doubles.
+Typed helpers are available for strings, booleans, integers, long integers, and doubles. Double helpers return the supplied default when the value cannot be parsed as a finite number.
 
 ## Microsoft.Extensions Integration
 
@@ -369,6 +369,8 @@ Reload from a JSON file:
 var checker = new FeatureChecker(new FeatureFileProvider("features.json"));
 ```
 
+Create a new evaluator or scope to observe file updates. When `FeatureCheckerOptions.FilePath` is configured, file read errors are surfaced to the caller. Use `Snapshot` for inline configuration.
+
 Implement your own provider for ManagedCode.Storage, object storage, databases, edge config, or other backends:
 
 ```csharp
@@ -432,7 +434,7 @@ dotnet pack ManagedCode.FeatureChecker/ManagedCode.FeatureChecker.csproj --confi
 
 ## Release Flow
 
-CI runs restore, format, build, analyzer, test, and coverage gates. The release workflow runs on `v*` tags or manual dispatch, validates the version from `Directory.Build.props`, packs the NuGet package, publishes to NuGet, uploads package artifacts, and creates a GitHub Release.
+CI runs restore, format, build, analyzers, the full and integration test suites, and the 85% line coverage gate. The release workflow runs on pushes to `main` or manual dispatch. It reads the version from `Directory.Build.props` and creates the version tag and GitHub Release after publishing the NuGet package.
 
 ## Package Metadata
 

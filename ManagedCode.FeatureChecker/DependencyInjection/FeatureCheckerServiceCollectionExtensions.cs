@@ -1,4 +1,5 @@
 using ManagedCode.FeatureChecker.Access;
+using ManagedCode.FeatureChecker.Definitions;
 using ManagedCode.FeatureChecker.Evaluation;
 using ManagedCode.FeatureChecker.Segments;
 using ManagedCode.FeatureChecker.Storage;
@@ -37,12 +38,12 @@ public static class FeatureCheckerServiceCollectionExtensions
 
         services.TryAddSingleton<TProvider>();
         services.RemoveAll<IFeatureDefinitionProvider>();
-        services.AddSingleton<IFeatureDefinitionProvider>(provider => provider.GetRequiredService<TProvider>());
+        services.AddSingleton<IFeatureDefinitionProvider>(provider => GetDefinitionContract(provider.GetRequiredService<TProvider>()));
         services.RemoveAll<IFeatureSegmentProvider>();
 
         if (typeof(IFeatureSegmentProvider).IsAssignableFrom(typeof(TProvider)))
         {
-            services.AddSingleton<IFeatureSegmentProvider>(provider => (IFeatureSegmentProvider)provider.GetRequiredService<TProvider>());
+            services.AddSingleton<IFeatureSegmentProvider>(provider => (IFeatureSegmentProvider)provider.GetRequiredService<IFeatureDefinitionProvider>());
         }
 
         return services.AddFeatureCheckerCore();
@@ -55,9 +56,15 @@ public static class FeatureCheckerServiceCollectionExtensions
 
         services.TryAddSingleton<TSource>();
         services.RemoveAll<IFeatureSnapshotSource>();
-        services.AddSingleton<IFeatureSnapshotSource>(provider => provider.GetRequiredService<TSource>());
+        services.AddSingleton<IFeatureSnapshotSource>(provider =>
+        {
+            var source = provider.GetRequiredService<TSource>();
+            return source is IDisposable or IAsyncDisposable
+                ? provider.GetRequiredService<FeatureSnapshotSourceProvider>()
+                : source;
+        });
 
-        return AddSnapshotSourceProvider(services).AddFeatureCheckerCore();
+        return AddSnapshotSourceProvider(services, static provider => provider.GetRequiredService<TSource>()).AddFeatureCheckerCore();
     }
 
     public static IServiceCollection AddFeatureCheckerSnapshotSource(this IServiceCollection services, IFeatureSnapshotSource source)
@@ -68,11 +75,16 @@ public static class FeatureCheckerServiceCollectionExtensions
         services.RemoveAll<IFeatureSnapshotSource>();
         services.AddSingleton(source);
 
-        return AddSnapshotSourceProvider(services).AddFeatureCheckerCore();
+        return AddSnapshotSourceProvider(services, static provider => provider.GetRequiredService<IFeatureSnapshotSource>()).AddFeatureCheckerCore();
     }
 
     private static IServiceCollection AddOptionsFeatureProvider(IServiceCollection services)
     {
+        if (services.Any(static service => !service.IsKeyedService && service.ServiceType == typeof(IFeatureDefinitionProvider)))
+        {
+            return services;
+        }
+
         services.TryAddSingleton<OptionsFeatureDefinitionProvider>();
         services.TryAddSingleton<IFeatureDefinitionProvider>(provider => provider.GetRequiredService<OptionsFeatureDefinitionProvider>());
         services.TryAddSingleton<IFeatureSegmentProvider>(provider => provider.GetRequiredService<OptionsFeatureDefinitionProvider>());
@@ -80,10 +92,12 @@ public static class FeatureCheckerServiceCollectionExtensions
         return services;
     }
 
-    private static IServiceCollection AddSnapshotSourceProvider(IServiceCollection services)
+    private static IServiceCollection AddSnapshotSourceProvider(
+        IServiceCollection services,
+        Func<IServiceProvider, IFeatureSnapshotSource> resolveSource)
     {
         services.RemoveAll<FeatureSnapshotSourceProvider>();
-        services.AddSingleton<FeatureSnapshotSourceProvider>();
+        services.AddSingleton(provider => new FeatureSnapshotSourceProvider(resolveSource(provider)));
         services.RemoveAll<IFeatureDefinitionProvider>();
         services.AddSingleton<IFeatureDefinitionProvider>(provider => provider.GetRequiredService<FeatureSnapshotSourceProvider>());
         services.RemoveAll<IFeatureSegmentProvider>();
@@ -92,11 +106,32 @@ public static class FeatureCheckerServiceCollectionExtensions
         return services;
     }
 
+    private static IFeatureDefinitionProvider GetDefinitionContract(IFeatureDefinitionProvider provider)
+    {
+        // Disposable aliases would register the same object with the container more than once.
+        if (provider is not (IDisposable or IAsyncDisposable))
+        {
+            return provider;
+        }
+
+        return provider is IFeatureSnapshotSource source
+            ? new FeatureSnapshotSourceProvider(source)
+            : new DefinitionProviderAdapter(provider);
+    }
+
     private static IServiceCollection AddFeatureCheckerCore(this IServiceCollection services)
     {
         services.TryAddSingleton<IFeatureCheckerFactory>(provider => new FeatureCheckerFactory(provider.GetRequiredService<IFeatureDefinitionProvider>()));
         services.TryAddTransient<IFeatureEvaluator>(provider => provider.GetRequiredService<IFeatureCheckerFactory>().Create());
 
         return services;
+    }
+
+    private sealed class DefinitionProviderAdapter(IFeatureDefinitionProvider provider) : IFeatureDefinitionProvider, IFeatureSegmentProvider
+    {
+        public IReadOnlyCollection<FeatureDefinition> GetFeatureDefinitions() => provider.GetFeatureDefinitions();
+
+        public IReadOnlyCollection<FeatureSegment> GetFeatureSegments() =>
+            provider is IFeatureSegmentProvider segmentProvider ? segmentProvider.GetFeatureSegments() : [];
     }
 }

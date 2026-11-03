@@ -24,15 +24,15 @@ public sealed record FeatureDefinition
 
     public string? OffValue { get; init; }
 
-    public IReadOnlyList<FeatureTarget> Targets { get; init; } = [];
+    public IReadOnlyList<FeatureTarget> Targets { get; init => field = FeatureCollections.Freeze(value); } = [];
 
-    public IReadOnlyList<FeatureTargetingRule> Rules { get; init; } = [];
+    public IReadOnlyList<FeatureTargetingRule> Rules { get; init => field = FeatureCollections.Freeze(value); } = [];
 
-    public IReadOnlyList<FeatureDependency> Dependencies { get; init; } = [];
+    public IReadOnlyList<FeatureDependency> Dependencies { get; init => field = FeatureCollections.Freeze(value); } = [];
 
-    public IReadOnlyList<FeatureVariant> Variants { get; init; } = [];
+    public IReadOnlyList<FeatureVariant> Variants { get; init => field = FeatureCollections.Freeze(value); } = [];
 
-    public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyDictionary<string, string> Metadata { get; init => field = FeatureCollections.FreezeMetadata(value); } = FeatureCollections.EmptyMetadata;
 
     public static FeatureDefinition Create(string key, FeatureStatus status)
     {
