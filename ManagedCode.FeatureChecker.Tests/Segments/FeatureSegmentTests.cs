@@ -3,6 +3,20 @@ namespace ManagedCode.FeatureChecker.Tests.Segments;
 public sealed class FeatureSegmentTests
 {
     [Test]
+    public void RejectedSegmentKeys_LeaveBothMembershipListsUnchanged()
+    {
+        var builder = new FeatureSegmentBuilder(Segments.Beta).Include(UserIds.Included).Exclude(UserIds.Excluded);
+
+        Should.Throw<ArgumentException>(() => builder.Include("prefix", " "));
+        Should.Throw<ArgumentException>(() => builder.Exclude("prefix", " "));
+
+        var unchanged = builder.Build();
+        unchanged.IncludedKeys.ShouldBe([UserIds.Included]);
+        unchanged.ExcludedKeys.ShouldBe([UserIds.Excluded]);
+        builder.Include("retry").Build().IncludedKeys.ShouldBe([UserIds.Included, "retry"]);
+    }
+
+    [Test]
     public void SegmentGraph_RevisitsUnresolvedMembershipAfterAnAlternativeRuleMatches()
     {
         var first = new FeatureSegment

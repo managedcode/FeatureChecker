@@ -36,6 +36,12 @@ public static class FeatureCheckerServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        if (typeof(TProvider) == typeof(IFeatureDefinitionProvider))
+        {
+            RequireDefaultRegistration<TProvider>(services);
+            return services.AddFeatureCheckerCore();
+        }
+
         services.TryAddSingleton<TProvider>();
         services.RemoveAll<IFeatureDefinitionProvider>();
         services.AddSingleton<IFeatureDefinitionProvider>(provider => GetDefinitionContract(provider.GetRequiredService<TProvider>()));
@@ -53,6 +59,12 @@ public static class FeatureCheckerServiceCollectionExtensions
         where TSource : class, IFeatureSnapshotSource
     {
         ArgumentNullException.ThrowIfNull(services);
+
+        if (typeof(TSource) == typeof(IFeatureSnapshotSource))
+        {
+            RequireDefaultRegistration<TSource>(services);
+            return AddSnapshotSourceProvider(services, static provider => provider.GetRequiredService<TSource>()).AddFeatureCheckerCore();
+        }
 
         services.TryAddSingleton<TSource>();
         services.RemoveAll<IFeatureSnapshotSource>();
@@ -80,7 +92,7 @@ public static class FeatureCheckerServiceCollectionExtensions
 
     private static IServiceCollection AddOptionsFeatureProvider(IServiceCollection services)
     {
-        if (services.Any(static service => !service.IsKeyedService && service.ServiceType == typeof(IFeatureDefinitionProvider)))
+        if (HasDefaultRegistration<IFeatureDefinitionProvider>(services))
         {
             return services;
         }
@@ -91,6 +103,17 @@ public static class FeatureCheckerServiceCollectionExtensions
 
         return services;
     }
+
+    private static void RequireDefaultRegistration<TService>(IServiceCollection services)
+    {
+        if (!HasDefaultRegistration<TService>(services))
+        {
+            throw new InvalidOperationException($"Register '{typeof(TService).Name}' before selecting it as the feature checker source.");
+        }
+    }
+
+    private static bool HasDefaultRegistration<TService>(IServiceCollection services) =>
+        services.Any(static service => !service.IsKeyedService && service.ServiceType == typeof(TService));
 
     private static IServiceCollection AddSnapshotSourceProvider(
         IServiceCollection services,
@@ -114,9 +137,10 @@ public static class FeatureCheckerServiceCollectionExtensions
             return provider;
         }
 
+        var definitions = new DefinitionProviderAdapter(provider);
         return provider is IFeatureSnapshotSource source
-            ? new FeatureSnapshotSourceProvider(source)
-            : new DefinitionProviderAdapter(provider);
+            ? new SnapshotDefinitionProviderAdapter(definitions, source)
+            : definitions;
     }
 
     private static IServiceCollection AddFeatureCheckerCore(this IServiceCollection services)
@@ -133,5 +157,15 @@ public static class FeatureCheckerServiceCollectionExtensions
 
         public IReadOnlyCollection<FeatureSegment> GetFeatureSegments() =>
             provider is IFeatureSegmentProvider segmentProvider ? segmentProvider.GetFeatureSegments() : [];
+    }
+
+    private sealed class SnapshotDefinitionProviderAdapter(DefinitionProviderAdapter definitions, IFeatureSnapshotSource source)
+        : IFeatureDefinitionProvider, IFeatureSegmentProvider, IFeatureSnapshotSource
+    {
+        public IReadOnlyCollection<FeatureDefinition> GetFeatureDefinitions() => definitions.GetFeatureDefinitions();
+
+        public IReadOnlyCollection<FeatureSegment> GetFeatureSegments() => definitions.GetFeatureSegments();
+
+        public FeatureSnapshot GetSnapshot() => source.GetSnapshot();
     }
 }

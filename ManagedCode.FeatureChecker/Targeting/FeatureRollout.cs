@@ -26,13 +26,8 @@ internal static class FeatureRollout
         return GetBucket(featureKey, targetingKey) < percentage;
     }
 
-    public static int? SelectVariantIndex(string featureKey, string targetingKey, IReadOnlyList<FeatureVariant> variants)
+    public static int SelectVariantIndex(string featureKey, string targetingKey, IReadOnlyList<FeatureVariant> variants)
     {
-        if (variants.Count == 0)
-        {
-            return null;
-        }
-
         var totalWeight = 0d;
         var largestWeight = 0d;
         for (var index = 0; index < variants.Count; index++)

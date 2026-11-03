@@ -3,6 +3,23 @@ namespace ManagedCode.FeatureChecker.Tests.Targeting;
 public sealed class FeatureEvaluationContextTests
 {
     [Test]
+    public void RejectedIdentityChanges_LeaveTheContextKindAndKeyUnchanged()
+    {
+        var builder = FeatureEvaluationContextBuilder.Create().ForTenant(TargetingKeys.TenantA);
+
+        Should.Throw<ArgumentNullException>(() => builder.ForUser(null!));
+        builder.Build().ContextKind.ShouldBe(FeatureContextKinds.Tenant);
+        Should.Throw<ArgumentException>(() => builder.ForSession(" "));
+
+        var unchanged = builder.Build();
+        unchanged.ContextKind.ShouldBe(FeatureContextKinds.Tenant);
+        unchanged.TargetingKey.ShouldBe(TargetingKeys.TenantA);
+        var updated = builder.ForSession("retry").Build();
+        updated.ContextKind.ShouldBe(FeatureContextKinds.Session);
+        updated.TargetingKey.ShouldBe("retry");
+    }
+
+    [Test]
     public void FeatureEvaluationContext_ShouldKeepAttributesImmutableAcrossDerivedContexts()
     {
         var input = new Dictionary<string, string>(StringComparer.Ordinal) { [AttributeNames.Count] = "42" };

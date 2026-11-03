@@ -15,14 +15,14 @@ public static class FeatureEvaluatorExtensions
     {
         ArgumentNullException.ThrowIfNull(evaluator);
 
-        return evaluator.Evaluate(featureKey, context).Value ?? defaultValue;
+        return GetExistingValue(evaluator.Evaluate(featureKey, context)) ?? defaultValue;
     }
 
     public static bool GetBooleanValue(this IFeatureEvaluator evaluator, string featureKey, bool defaultValue, FeatureEvaluationContext? context = null)
     {
         ArgumentNullException.ThrowIfNull(evaluator);
 
-        var value = evaluator.Evaluate(featureKey, context).Value;
+        var value = GetExistingValue(evaluator.Evaluate(featureKey, context));
 
         return bool.TryParse(value, out var result) ? result : defaultValue;
     }
@@ -31,7 +31,7 @@ public static class FeatureEvaluatorExtensions
     {
         ArgumentNullException.ThrowIfNull(evaluator);
 
-        var value = evaluator.Evaluate(featureKey, context).Value;
+        var value = GetExistingValue(evaluator.Evaluate(featureKey, context));
 
         return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result) ? result : defaultValue;
     }
@@ -40,7 +40,7 @@ public static class FeatureEvaluatorExtensions
     {
         ArgumentNullException.ThrowIfNull(evaluator);
 
-        var value = evaluator.Evaluate(featureKey, context).Value;
+        var value = GetExistingValue(evaluator.Evaluate(featureKey, context));
 
         return long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result) ? result : defaultValue;
     }
@@ -49,7 +49,7 @@ public static class FeatureEvaluatorExtensions
     {
         ArgumentNullException.ThrowIfNull(evaluator);
 
-        var value = evaluator.Evaluate(featureKey, context).Value;
+        var value = GetExistingValue(evaluator.Evaluate(featureKey, context));
 
         return GetFiniteDouble(value, defaultValue);
     }
@@ -59,7 +59,7 @@ public static class FeatureEvaluatorExtensions
         ArgumentNullException.ThrowIfNull(evaluator);
 
         var evaluation = evaluator.Evaluate(featureKey, context);
-        return CreateDetail(evaluation, evaluation.Value ?? defaultValue);
+        return CreateDetail(evaluation, GetExistingValue(evaluation) ?? defaultValue);
     }
 
     public static FeatureVariationDetail<bool> BoolVariationDetail(this IFeatureEvaluator evaluator, string featureKey, bool defaultValue, FeatureEvaluationContext? context = null)
@@ -67,7 +67,7 @@ public static class FeatureEvaluatorExtensions
         ArgumentNullException.ThrowIfNull(evaluator);
 
         var evaluation = evaluator.Evaluate(featureKey, context);
-        return CreateDetail(evaluation, bool.TryParse(evaluation.Value, out var result) ? result : defaultValue);
+        return CreateDetail(evaluation, bool.TryParse(GetExistingValue(evaluation), out var result) ? result : defaultValue);
     }
 
     public static FeatureVariationDetail<int> IntVariationDetail(this IFeatureEvaluator evaluator, string featureKey, int defaultValue, FeatureEvaluationContext? context = null)
@@ -75,7 +75,7 @@ public static class FeatureEvaluatorExtensions
         ArgumentNullException.ThrowIfNull(evaluator);
 
         var evaluation = evaluator.Evaluate(featureKey, context);
-        return CreateDetail(evaluation, int.TryParse(evaluation.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result) ? result : defaultValue);
+        return CreateDetail(evaluation, int.TryParse(GetExistingValue(evaluation), NumberStyles.Integer, CultureInfo.InvariantCulture, out var result) ? result : defaultValue);
     }
 
     public static FeatureVariationDetail<double> DoubleVariationDetail(this IFeatureEvaluator evaluator, string featureKey, double defaultValue, FeatureEvaluationContext? context = null)
@@ -83,8 +83,10 @@ public static class FeatureEvaluatorExtensions
         ArgumentNullException.ThrowIfNull(evaluator);
 
         var evaluation = evaluator.Evaluate(featureKey, context);
-        return CreateDetail(evaluation, GetFiniteDouble(evaluation.Value, defaultValue));
+        return CreateDetail(evaluation, GetFiniteDouble(GetExistingValue(evaluation), defaultValue));
     }
+
+    private static string? GetExistingValue(FeatureEvaluation evaluation) => evaluation.Exists ? evaluation.Value : null;
 
     private static double GetFiniteDouble(string? value, double defaultValue)
     {

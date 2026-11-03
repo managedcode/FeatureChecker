@@ -48,17 +48,17 @@ public sealed class FeatureEvaluationContextBuilder
 
     public FeatureEvaluationContextBuilder ForUser(string userId)
     {
-        return WithContextKind(FeatureContextKinds.User).WithTargetingKey(userId).WithUserId(userId);
+        return WithTargetingKey(userId).WithContextKind(FeatureContextKinds.User).WithUserId(userId);
     }
 
     public FeatureEvaluationContextBuilder ForTenant(string tenantId)
     {
-        return WithContextKind(FeatureContextKinds.Tenant).WithTargetingKey(tenantId).WithTenantId(tenantId);
+        return WithTargetingKey(tenantId).WithContextKind(FeatureContextKinds.Tenant).WithTenantId(tenantId);
     }
 
     public FeatureEvaluationContextBuilder ForSession(string sessionId)
     {
-        return WithContextKind(FeatureContextKinds.Session).WithTargetingKey(sessionId).WithSessionId(sessionId);
+        return WithTargetingKey(sessionId).WithContextKind(FeatureContextKinds.Session).WithSessionId(sessionId);
     }
 
     public FeatureEvaluationContextBuilder WithUserId(string userId)

@@ -61,6 +61,6 @@ Adapters should fetch and persist snapshots, then pass definitions into `Feature
 
 Use `IFeatureSnapshotSource` when a backend can provide a complete snapshot. It keeps features and segments from the same source version and lets application code refresh by creating fresh evaluators or scopes through `IFeatureCheckerFactory`.
 
-Snapshots own their feature and segment collections. Evaluators for the same snapshot share its lookup index. A fresh evaluator captures the latest snapshot from its provider.
+Snapshots own their feature and segment collections. Feature and segment metadata keep distinct JSON property names, including names that differ only in case. Evaluators for the same snapshot share its lookup index. A fresh evaluator captures the latest snapshot from its provider.
 
-`FeatureFileProvider` compares file contents and reuses the parsed snapshot for unchanged files up to 1 MiB. `FeatureSnapshotSerializer.Save` stages output alongside the destination and replaces the file after serialization succeeds. A JSON `null` document is invalid.
+`FeatureFileProvider` compares file contents and reuses the parsed snapshot for unchanged files up to 1 MiB. `FeatureSnapshotSerializer.Save` stages output alongside the destination and replaces the file after serialization succeeds. It rejects a read-only destination. Snapshot readers reject JSON `null` documents and duplicate properties.

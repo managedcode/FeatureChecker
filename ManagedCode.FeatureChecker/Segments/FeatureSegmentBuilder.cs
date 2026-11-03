@@ -77,12 +77,15 @@ public sealed class FeatureSegmentBuilder
         };
     }
 
-    private static void AddKeys(List<string> target, IEnumerable<string> keys)
+    private static void AddKeys(List<string> target, string[] targetingKeys)
     {
-        foreach (var key in keys)
+        ArgumentNullException.ThrowIfNull(targetingKeys);
+
+        foreach (var key in targetingKeys)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(key, nameof(keys));
-            target.Add(key);
+            ArgumentException.ThrowIfNullOrWhiteSpace(key, nameof(targetingKeys));
         }
+
+        target.AddRange(targetingKeys);
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 
@@ -23,6 +24,14 @@ internal static class FeatureCollections
     {
         ArgumentNullException.ThrowIfNull(values);
 
-        return values.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+        return values switch
+        {
+            FrozenDictionary<string, string> or ImmutableDictionary<string, string> or ImmutableSortedDictionary<string, string> => values,
+            Dictionary<string, string> dictionary => dictionary.ToFrozenDictionary(dictionary.Comparer),
+            ConcurrentDictionary<string, string> concurrent => concurrent.ToArray().ToFrozenDictionary(concurrent.Comparer),
+            SortedDictionary<string, string> sorted => ImmutableSortedDictionary.CreateRange(sorted.Comparer, sorted),
+            SortedList<string, string> sorted => ImmutableSortedDictionary.CreateRange(sorted.Comparer, sorted),
+            _ => values.ToFrozenDictionary(StringComparer.Ordinal)
+        };
     }
 }

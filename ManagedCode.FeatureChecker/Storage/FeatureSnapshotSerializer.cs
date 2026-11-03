@@ -107,6 +107,11 @@ public static class FeatureSnapshotSerializer
     {
         if (File.Exists(destination))
         {
+            if (File.GetAttributes(destination).HasFlag(FileAttributes.ReadOnly))
+            {
+                throw new UnauthorizedAccessException($"The feature snapshot '{destination}' is read-only.");
+            }
+
             if (OperatingSystem.IsWindows())
             {
                 File.Replace(stagingPath, destination, destinationBackupFileName: null);
@@ -121,7 +126,11 @@ public static class FeatureSnapshotSerializer
 
     private static JsonSerializerOptions CreateOptions()
     {
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            AllowDuplicateProperties = false,
+            WriteIndented = true
+        };
         options.Converters.Add(new JsonStringEnumConverter());
         return options;
     }

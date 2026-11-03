@@ -101,16 +101,16 @@ internal sealed class FeatureEvaluationEngine
             return FeatureEvaluationFactory.Constant(definition);
         }
 
-        var target = FindTarget(definition, context);
-        if (target is not null)
+        var targetIndex = FindTargetIndex(definition, context);
+        if (targetIndex >= 0)
         {
-            return FeatureEvaluationFactory.Target(definition, target);
+            return FeatureEvaluationFactory.Target(definition, targetIndex);
         }
 
-        var matchedRule = FindRule(definition, context);
-        if (matchedRule.Rule is not null)
+        var ruleIndex = FindRuleIndex(definition, context);
+        if (ruleIndex >= 0)
         {
-            return FeatureEvaluationFactory.Rule(definition, matchedRule.Rule, matchedRule.Index);
+            return FeatureEvaluationFactory.Rule(definition, ruleIndex);
         }
 
         return FeatureEvaluationFactory.Fallthrough(definition, context);
@@ -137,7 +137,7 @@ internal sealed class FeatureEvaluationEngine
         return statusMatches && variantMatches ? null : FeatureEvaluationFactory.DependencyBlocked(definition);
     }
 
-    private (FeatureTargetingRule? Rule, int Index) FindRule(FeatureDefinition definition, FeatureEvaluationContext context)
+    private int FindRuleIndex(FeatureDefinition definition, FeatureEvaluationContext context)
     {
         for (var index = 0; index < definition.Rules.Count; index++)
         {
@@ -145,18 +145,18 @@ internal sealed class FeatureEvaluationEngine
 
             if (rule.Matches(definition.Key, context, _matchSegment))
             {
-                return (rule, index);
+                return index;
             }
         }
 
-        return (null, -1);
+        return -1;
     }
 
-    private static FeatureTarget? FindTarget(FeatureDefinition definition, FeatureEvaluationContext context)
+    private static int FindTargetIndex(FeatureDefinition definition, FeatureEvaluationContext context)
     {
         if (string.IsNullOrWhiteSpace(context.TargetingKey))
         {
-            return null;
+            return -1;
         }
 
         for (var index = 0; index < definition.Targets.Count; index++)
@@ -165,11 +165,11 @@ internal sealed class FeatureEvaluationEngine
             if (string.Equals(target.Key, context.TargetingKey, StringComparison.Ordinal)
                 && (target.ContextKind is null || string.Equals(target.ContextKind, context.ContextKind, StringComparison.OrdinalIgnoreCase)))
             {
-                return target;
+                return index;
             }
         }
 
-        return null;
+        return -1;
     }
 
     private readonly record struct DependencyFrame(FeatureDefinition Definition, int Index);

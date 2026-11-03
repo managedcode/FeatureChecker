@@ -3,6 +3,40 @@ namespace ManagedCode.FeatureChecker.Tests.Definitions;
 public sealed class FeatureDefinitionOwnershipTests
 {
     [Test]
+    public void Metadata_PreservesDistinctKeysWithDifferentCasing()
+    {
+        var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Owner"] = "product",
+            ["owner"] = "engineering"
+        };
+        var snapshot = new FeatureSnapshot
+        {
+            Features = [new FeatureDefinition { Key = "reports", Metadata = metadata }],
+            Segments = [new FeatureSegment { Key = "beta", Metadata = metadata }]
+        };
+        metadata.Clear();
+
+        snapshot.Features[0].Metadata["Owner"].ShouldBe("product");
+        snapshot.Features[0].Metadata["owner"].ShouldBe("engineering");
+        var reloaded = FeatureSnapshotSerializer.Deserialize(FeatureSnapshotSerializer.Serialize(snapshot));
+        reloaded.Features[0].Metadata["Owner"].ShouldBe("product");
+        reloaded.Segments[0].Metadata["owner"].ShouldBe("engineering");
+        reloaded.Features[0].Metadata.Count.ShouldBe(2);
+        reloaded.Segments[0].Metadata.Count.ShouldBe(2);
+    }
+
+    [Test]
+    public void Metadata_PreservesCaseInsensitiveLookupFromSortedDictionaries()
+    {
+        var metadata = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["owner"] = "product" };
+        var segment = new FeatureSegment { Key = "beta", Metadata = metadata };
+        metadata["owner"] = "other";
+
+        segment.Metadata["OWNER"].ShouldBe("product");
+    }
+
+    [Test]
     public void Evaluation_UsesTheDefinitionAndSegmentDataCapturedAtInitialization()
     {
         const string key = "reports";

@@ -247,7 +247,7 @@ FeatureVariationDetail<string> detail = checker.StringVariationDetail(
 Console.WriteLine($"{detail.Value} {detail.ReasonKind} {detail.VariationIndex}");
 ```
 
-Typed helpers are available for strings, booleans, integers, long integers, and doubles. Double helpers return the supplied default when the value cannot be parsed as a finite number.
+Typed helpers are available for strings, booleans, integers, long integers, and doubles. They return the supplied default when the feature is missing or the value cannot be parsed as the requested type. Double helpers require finite values.
 
 ## Microsoft.Extensions Integration
 

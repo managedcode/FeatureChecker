@@ -7,10 +7,27 @@ namespace ManagedCode.FeatureChecker.Evaluation;
 internal static class FeatureEvaluationFactory
 {
     private static readonly ConditionalWeakTable<FeatureDefinition, FeatureEvaluation> ConstantResults = new();
+    private static readonly ConditionalWeakTable<FeatureDefinition, FeatureEvaluation?[]> TargetResults = new();
+    private static readonly ConditionalWeakTable<FeatureDefinition, FeatureEvaluation?[]> RuleResults = new();
 
     public static FeatureEvaluation Constant(FeatureDefinition definition)
     {
-        return ConstantResults.GetValue(definition, static item => item.TargetingEnabled ? Fallthrough(item, FeatureEvaluationContext.Empty) : Off(item));
+        return ConstantResults.GetValue(definition, CreateConstantResult);
+    }
+
+    private static FeatureEvaluation CreateConstantResult(FeatureDefinition definition)
+    {
+        if (!definition.TargetingEnabled)
+        {
+            return Off(definition);
+        }
+
+        if (!string.IsNullOrWhiteSpace(definition.FallthroughVariant))
+        {
+            return Variation(definition, definition.FallthroughVariant, definition.FallthroughValue, definition.Status, FeatureEvaluationReasons.Fallthrough, FeatureEvaluationReasonKind.Fallthrough);
+        }
+
+        return Create(definition.Key, true, definition.Status, null, definition.Value, FeatureEvaluationReasons.Default, FeatureEvaluationReasonKind.Default);
     }
 
     public static FeatureEvaluation Missing(string key)
@@ -35,15 +52,43 @@ internal static class FeatureEvaluationFactory
             : Variation(definition, definition.OffVariant, definition.OffValue, FeatureStatus.Disabled, FeatureEvaluationReasons.Off, FeatureEvaluationReasonKind.Off);
     }
 
-    public static FeatureEvaluation Target(FeatureDefinition definition, FeatureTarget target)
+    public static FeatureEvaluation Target(FeatureDefinition definition, int targetIndex)
     {
+        var results = TargetResults.GetValue(definition, static item => new FeatureEvaluation?[item.Targets.Count]);
+        ref var slot = ref results[targetIndex];
+        if (Volatile.Read(ref slot) is { } cached)
+        {
+            return cached;
+        }
+
+        var evaluation = CreateTargetResult(definition, targetIndex);
+        return Interlocked.CompareExchange(ref slot, evaluation, null) ?? evaluation;
+    }
+
+    private static FeatureEvaluation CreateTargetResult(FeatureDefinition definition, int targetIndex)
+    {
+        var target = definition.Targets[targetIndex];
         return string.IsNullOrWhiteSpace(target.Variant)
             ? Create(definition.Key, true, target.Status, null, target.Value ?? definition.Value, FeatureEvaluationReasons.Target, FeatureEvaluationReasonKind.TargetMatch)
             : Variation(definition, target.Variant, target.Value, target.Status, FeatureEvaluationReasons.Target, FeatureEvaluationReasonKind.TargetMatch);
     }
 
-    public static FeatureEvaluation Rule(FeatureDefinition definition, FeatureTargetingRule rule, int ruleIndex)
+    public static FeatureEvaluation Rule(FeatureDefinition definition, int ruleIndex)
     {
+        var results = RuleResults.GetValue(definition, static item => new FeatureEvaluation?[item.Rules.Count]);
+        ref var slot = ref results[ruleIndex];
+        if (Volatile.Read(ref slot) is { } cached)
+        {
+            return cached;
+        }
+
+        var evaluation = CreateRuleResult(definition, ruleIndex);
+        return Interlocked.CompareExchange(ref slot, evaluation, null) ?? evaluation;
+    }
+
+    private static FeatureEvaluation CreateRuleResult(FeatureDefinition definition, int ruleIndex)
+    {
+        var rule = definition.Rules[ruleIndex];
         var ruleMatch = new FeatureRuleMatch
         {
             RuleName = rule.Name,
@@ -57,30 +102,24 @@ internal static class FeatureEvaluationFactory
 
     public static FeatureEvaluation Fallthrough(FeatureDefinition definition, FeatureEvaluationContext context)
     {
-        if (!string.IsNullOrWhiteSpace(definition.FallthroughVariant))
+        if (!string.IsNullOrWhiteSpace(definition.FallthroughVariant)
+            || definition.Variants.Count == 0
+            || string.IsNullOrWhiteSpace(context.TargetingKey))
         {
-            return Variation(definition, definition.FallthroughVariant, definition.FallthroughValue, definition.Status, FeatureEvaluationReasons.Fallthrough, FeatureEvaluationReasonKind.Fallthrough);
+            return Constant(definition);
         }
 
-        if (!string.IsNullOrWhiteSpace(context.TargetingKey))
-        {
-            var variantIndex = FeatureRollout.SelectVariantIndex(definition.Key, context.TargetingKey, definition.Variants);
-            if (variantIndex is { } index)
-            {
-                var variant = definition.Variants[index];
-                return Create(
-                    definition.Key,
-                    true,
-                    variant.Status,
-                    variant.Name,
-                    variant.Value,
-                    FeatureEvaluationReasons.Variant,
-                    FeatureEvaluationReasonKind.Variant,
-                    index);
-            }
-        }
-
-        return Create(definition.Key, true, definition.Status, null, definition.Value, FeatureEvaluationReasons.Default, FeatureEvaluationReasonKind.Default);
+        var index = FeatureRollout.SelectVariantIndex(definition.Key, context.TargetingKey, definition.Variants);
+        var variant = definition.Variants[index];
+        return Create(
+            definition.Key,
+            true,
+            variant.Status,
+            variant.Name,
+            variant.Value,
+            FeatureEvaluationReasons.Variant,
+            FeatureEvaluationReasonKind.Variant,
+            index);
     }
 
     private static FeatureEvaluation Variation(
